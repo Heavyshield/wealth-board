@@ -1,0 +1,6 @@
+﻿name;isin;quantity;buyingPrice;lastPrice;intradayVariation;amount;amountVariation;variation;lastMovementDate
+"Exemple Industries (fictif)";FR0000000001;45;51,20;62,50;0,80;2 812,50;507,50;22,07;12/11/2026
+"ETF Monde Exemple (fictif)";IE0000000003;25;80,00;92,40;0,10;2 310,00;310,00;15,50;03/02/2026
+"Nouvelle Société; fictive";FR0000000009;12;"1 050,00";1 080,00;-0,50;12 960,00;360,00;2,86;20/11/2026
+"Tracker MSCI Exemple (fictif)";LU0000000007;3;100;101;0;303;3;1;20/11/2026
+;;;;;;18 385,50;;;

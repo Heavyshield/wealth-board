@@ -122,6 +122,22 @@ dialog h2 { margin-top: 0; }
 .dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 button:disabled { opacity: .55; cursor: progress; }
 
+/* Stage e: import dialog */
+dialog.wide { max-width: min(860px, 96vw); width: 100%; }
+.import-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 12px; }
+.import-meta, .import-summary { font-size: .9rem; color: var(--muted); }
+.import-summary { font-weight: 600; color: var(--text); }
+.import-result h3 { font-size: .95rem; margin: 14px 0 4px; }
+.import-problems { border-left: 3px solid var(--st-warn); padding: 4px 10px; margin: 8px 0; font-size: .88rem; }
+.import-problems ul { margin: 4px 0; padding-left: 18px; }
+table.diff td { vertical-align: top; }
+table.diff td:first-child { width: 28px; }
+.d-add td:nth-child(2) { border-left: 3px solid var(--st-good); }
+.d-chg td:nth-child(2) { border-left: 3px solid var(--accent); }
+.d-del td:nth-child(2) { border-left: 3px solid var(--st-crit); }
+del { color: var(--muted); } ins { text-decoration: none; font-weight: 600; }
+.import-result .errors { margin-top: 8px; }
+
 /* Chart cards */
 .viz { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .card h2 { margin: 0; font-size: 1rem; }

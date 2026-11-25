@@ -242,8 +242,7 @@
       "goldapi"
     ],
     "quote": [
-      "yahoo_proxy",
-      "twelvedata"
+      "yahoo_proxy"
     ],
     "ttl_minutes": {
       "quote": 15,
@@ -251,5 +250,66 @@
       "fx": 360
     },
     "auto_refresh": true
+  },
+  "imports": {
+    "boursorama": {
+      "label": "Boursorama — positions (CSV)",
+      "envelope_default": "pea",
+      "columns": {
+        "isin": [
+          "isin",
+          "code isin",
+          "isin code"
+        ],
+        "name": [
+          "name",
+          "libelle",
+          "libellé",
+          "valeur",
+          "nom",
+          "instrument",
+          "titre"
+        ],
+        "quantity": [
+          "quantity",
+          "quantite",
+          "quantité",
+          "qte",
+          "qté",
+          "nombre",
+          "nb titres"
+        ],
+        "unit_cost": [
+          "buyingPrice",
+          "buying price",
+          "prix de revient",
+          "prix revient",
+          "pru",
+          "prix d'achat moyen",
+          "pam",
+          "cout moyen"
+        ],
+        "last_price": [
+          "lastPrice",
+          "last price",
+          "cours",
+          "dernier cours",
+          "dernier"
+        ],
+        "currency": [
+          "currency",
+          "devise"
+        ]
+      },
+      "required": [
+        "quantity"
+      ],
+      "update_fields": [
+        "quantity",
+        "unit_cost"
+      ],
+      "asset_class_default": "equity",
+      "etf_name_pattern": "(^|[^A-Z])(ETF|UCITS|TRACKER|MSCI|STOXX|NASDAQ)([^A-Z]|$)"
+    }
   }
 }

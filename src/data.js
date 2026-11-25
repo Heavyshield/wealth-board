@@ -51,6 +51,12 @@ export function crossCheck(portfolio, config) {
     if (c.envelope && !envelopes.has(c.envelope)) errors.push({ path: at, message: `enveloppe « ${c.envelope} » inconnue` });
     scopeErrs(c.liquid, at);
   });
+  for (const [id, p] of Object.entries(config.imports ?? {})) {
+    const at = `config.imports.${id}`;
+    if (p.envelope_default && !envelopes.has(p.envelope_default)) errors.push({ path: at, message: `enveloppe « ${p.envelope_default} » inconnue` });
+    if (p.asset_class_default && !classes.has(p.asset_class_default)) errors.push({ path: at, message: `classe « ${p.asset_class_default} » inconnue` });
+    if (!p.columns.isin && !p.columns.name) errors.push({ path: `${at}.columns`, message: 'il faut au moins des alias pour isin ou name (pour reconnaître les lignes)' });
+  }
   (portfolio.accounts ?? []).forEach((a, i) => {
     if (!envelopes.has(a.envelope)) errors.push({ path: `accounts[${i}]`, message: `enveloppe « ${a.envelope} » inconnue` });
   });

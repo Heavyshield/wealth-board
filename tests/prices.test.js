@@ -5,7 +5,6 @@
 import * as frank from '../src/providers/frankfurter.js';
 import * as ecb from '../src/providers/ecb.js';
 import * as gold from '../src/providers/goldapi.js';
-import * as td from '../src/providers/twelvedata.js';
 import * as yp from '../src/providers/yahoo-proxy.js';
 import worker from '../tools/yahoo-proxy-worker.js';
 import { refreshPrices, mergeLive, persistPrices, liveFromCache } from '../src/prices.js';
@@ -22,7 +21,7 @@ export async function pricesTests({ test, assert, eq, files, schemas, validate, 
   const F = {
     frank: await fx('frankfurter.json'), ecb: await fx('ecb.json'), gold: await fx('goldapi-xau-eur.json'),
     tte: await fx('yahoo-chart-tte.json'), vod: await fx('yahoo-chart-vod-gbp.json'), volvo: await fx('yahoo-chart-volvo-sek.json'),
-    unknown: await fx('yahoo-chart-unknown.json'), tdBatch: await fx('twelvedata-batch.json'), tdSingle: await fx('twelvedata-single.json'),
+    unknown: await fx('yahoo-chart-unknown.json'),
   };
 
   await test('Change : Frankfurter et BCE (deux sources) donnent les mêmes taux', () => {
@@ -76,72 +75,74 @@ export async function pricesTests({ test, assert, eq, files, schemas, validate, 
     eq(Object.keys(parsed.results).length, 2, 'adaptateur : 2 cours'); assert(parsed.errors['NOPE.PA'], 'adaptateur : 1 erreur');
   });
 
-  await test('Twelve Data : lot, unitaire, erreur de plan', () => {
-    const b = td.parse(F.tdBatch, ['AAPL', 'MSFT']);
-    eq(Object.keys(b.results).length, 2, 'lot');
-    eq(b.results.AAPL.value, Number(F.tdBatch.AAPL.close), 'AAPL'); eq(b.results.AAPL.prev_close, Number(F.tdBatch.AAPL.previous_close), 'veille');
-    eq(td.parse(F.tdSingle, ['AAPL']).results.AAPL.currency, 'USD', 'unitaire');
-    const err = td.parse({ code: 404, message: 'This symbol is available starting with the Grow or Venture plan.', status: 'error' }, ['TTE']);
-    assert(/Grow/.test(err.errors.TTE), 'erreur de plan remontée');
-  });
-
   // -------------------------------------------------------------- orchestration with a fake network
   const config = structuredClone(files.config);
   const portfolio = structuredClone(files.portfolio);
   portfolio.holdings.find((h) => h.id === 'pea-exemple-industries').ticker = 'TTE.PA';
   portfolio.holdings.find((h) => h.id === 'cto-sample-corp').ticker = 'AAPL';
-  // File price older than the captured quote, so the merge (newest wins) uses the live one.
+  // AAPL has no captured Yahoo answer here: it exercises the 'unknown symbol' path.
   portfolio.holdings.find((h) => h.id === 'cto-sample-corp').last_price.as_of = '2026-11-20T21:00:00Z';
+  // Fake network: FX / metals from fixtures; the proxy URL is served by the REAL worker code,
+  // whose Yahoo upstream answers from the captured fixtures (TTE.PA known, anything else unknown).
   const calls = [];
+  const yahoo = async (url) => res(200, url.includes('/TTE.PA') ? F.tte : F.unknown);
   const net = async (url) => {
     calls.push(url);
     if (url.includes('frankfurter')) return res(200, F.frank);
     if (url.includes('gold-api')) return res(200, { ...F.gold, symbol: url.match(/price\/(\w+)/)[1] });
-    if (url.includes('proxy.test')) return res(503, null);
-    if (url.includes('twelvedata')) {
-      const syms = decodeURIComponent(url.match(/symbol=([^&]+)/)[1]).split(',');
-      return res(200, syms.length === 1 ? F.tdSingle : Object.fromEntries(syms.map((s) => [s, F.tdBatch[s] ?? { code: 404, status: 'error', message: 'Grow plan' }])));
+    if (url.startsWith('https://proxy.test')) {
+      return worker.handle({ url, method: 'GET', headers: new Headers({ Origin: 'http://localhost:8770' }) }, {}, yahoo);
     }
+    if (url.startsWith('https://down.test')) return res(503, null);
     return res(404, null);
   };
-  const settings = { yahoo_proxy_url: 'https://proxy.test', twelvedata_key: 'test-key' };
+  const settings = { yahoo_proxy_url: 'https://proxy.test' };
+  const run = (extra = {}) => refreshPrices(portfolio, config, { fetch: net, storage: memoryStorage(), settings, now: NOW, sleep: async () => {}, ...extra });
 
-  await test('Chaîne : proxy en panne → Twelve Data ; non couvert signalé, jamais inventé', async () => {
-    const storage = memoryStorage(); calls.length = 0;
-    const { live, report } = await refreshPrices(portfolio, config, { fetch: net, storage, settings, now: NOW, sleep: async () => {} });
-    assert(calls.some((u) => u.includes('proxy.test')), 'proxy essayé');
-    eq(live.quotes['cto-sample-corp']?.source, 'Twelve Data', 'AAPL via Twelve Data');
-    assert(!live.quotes['pea-exemple-industries'], 'TTE.PA : pas de cours inventé');
-    const tdRep = report.find((r) => r.provider === 'twelvedata');
-    assert(tdRep.errors['TTE.PA'], 'erreur TTE.PA remontée');
+  await test('Chaîne complète : adaptateur → proxy → Yahoo ; symbole inconnu signalé, jamais inventé', async () => {
+    calls.length = 0;
+    const { live, report } = await run();
+    eq(live.quotes['pea-exemple-industries']?.source, 'Yahoo (proxy)', 'TTE.PA via le proxy');
+    eq(live.quotes['pea-exemple-industries'].value, F.tte.chart.result[0].meta.regularMarketPrice, 'cours TTE.PA');
+    assert(!live.quotes['cto-sample-corp'], 'AAPL inconnu ici : pas de cours inventé');
+    assert(report.find((r) => r.provider === 'yahoo_proxy').errors.AAPL, 'erreur AAPL remontée');
     assert(live.fx.CHF && live.spot.XAU, 'change + métaux');
+    eq(calls.filter((u) => u.startsWith('https://proxy.test')).length, 1, 'une seule requête pour toutes les actions');
+  });
+
+  await test('Proxy en panne : erreur remontée pour chaque ligne, aucun cours', async () => {
+    const { live, report } = await run({ settings: { yahoo_proxy_url: 'https://down.test' } });
+    eq(Object.keys(live.quotes).length, 0, 'aucun cours');
+    const errs = report.find((r) => r.provider === 'yahoo_proxy').errors;
+    assert(errs['TTE.PA'] && errs.AAPL, JSON.stringify(errs));
   });
 
   await test('Cache : dans le TTL aucune requête ; forcer = nouvelles requêtes', async () => {
     const storage = memoryStorage();
-    await refreshPrices(portfolio, config, { fetch: net, storage, settings, now: NOW, sleep: async () => {} });
+    await run({ storage });
     calls.length = 0;
-    await refreshPrices(portfolio, config, { fetch: net, storage, settings, now: new Date(NOW.getTime() + 5 * 6e4), sleep: async () => {} });
-    eq(calls.filter((u) => !u.includes('proxy.test') && !u.includes('TTE')).length, 0, 'aucune requête dans le TTL (hors échecs)');
+    await run({ storage, now: new Date(NOW.getTime() + 5 * 6e4) });
+    eq(calls.filter((u) => !u.startsWith('https://proxy.test')).length, 0, 'change et métaux en cache');
+    const proxyCalls = calls.filter((u) => u.startsWith('https://proxy.test'));
+    assert(proxyCalls.every((u) => !u.includes('TTE.PA')), 'TTE.PA en cache, seul l’échec est redemandé');
     calls.length = 0;
-    await refreshPrices(portfolio, config, { fetch: net, storage, settings, now: NOW, force: true, sleep: async () => {} });
+    await run({ storage, force: true });
     assert(calls.some((u) => u.includes('frankfurter')), 'forcé : change redemandé');
   });
 
-  await test('Non configuré : fournisseur sauté et signalé', async () => {
-    const { report } = await refreshPrices(portfolio, config, { fetch: net, storage: memoryStorage(), settings: {}, now: NOW, sleep: async () => {} });
+  await test('Non configuré : proxy sauté et signalé', async () => {
+    const { report } = await run({ settings: {} });
     assert(report.find((r) => r.provider === 'yahoo_proxy').skipped, 'proxy sauté');
-    assert(report.find((r) => r.provider === 'twelvedata').skipped, 'Twelve Data sauté');
   });
 
-  await test('Limite Twelve Data : 9 symboles = 2 lots + 1 pause', async () => {
+  await test('Lots : 21 actions = 2 requêtes au proxy (max 20), sans pause', async () => {
     const p = structuredClone(portfolio);
-    const base = p.holdings.find((h) => h.id === 'cto-sample-corp');
+    const base = p.holdings.find((h) => h.id === 'pea-exemple-industries');
     p.holdings = p.holdings.filter((h) => h.asset_class !== 'equity' && h.asset_class !== 'etf');
-    for (let i = 0; i < 9; i++) p.holdings.push({ ...structuredClone(base), id: `us-${i}`, ticker: `US${i}`, price_source: 'quote:twelvedata' });
+    for (let i = 0; i < 21; i++) p.holdings.push({ ...structuredClone(base), id: `eq-${i}`, ticker: `EQ${i}.PA` });
     let sleeps = 0; calls.length = 0;
     await refreshPrices(p, config, { fetch: net, storage: memoryStorage(), settings, now: NOW, sleep: async () => { sleeps++; } });
-    eq(calls.filter((u) => u.includes('twelvedata')).length, 2, 'requêtes'); eq(sleeps, 1, 'pauses');
+    eq(calls.filter((u) => u.startsWith('https://proxy.test')).length, 2, 'requêtes'); eq(sleeps, 0, 'pauses');
   });
 
   await test('Fusion : le plus récent gagne ; prix manuel jamais écrasé', () => {
@@ -156,13 +157,13 @@ export async function pricesTests({ test, assert, eq, files, schemas, validate, 
 
   await test('Mémoriser les cours : fichier valide, journal, révision', async () => {
     const storage = memoryStorage();
-    const { live } = await refreshPrices(portfolio, config, { fetch: net, storage, settings, now: NOW, sleep: async () => {} });
+    const { live } = await run({ storage });
     const merged = mergeLive(portfolio, config, live);
     const next = persistPrices(portfolio, merged, 'user', NOW);
     assert(validate(schemas.portfolio, next).length === 0, JSON.stringify(validate(schemas.portfolio, next).slice(0, 3)));
     eq(next.revision, portfolio.revision + 1, 'révision');
     eq(next.changelog.at(-1).field, 'prices', 'journal');
-    eq(next.holdings.find((h) => h.id === 'cto-sample-corp').last_price.source, 'Twelve Data', 'last_price écrit');
+    eq(next.holdings.find((h) => h.id === 'pea-exemple-industries').last_price.source, 'Yahoo (proxy)', 'last_price écrit');
     eq(Object.keys(liveFromCache(portfolio, config, JSON.parse(storage.getItem('wb.cache.prices'))).quotes).length, 1, 'cache relu');
   });
 }

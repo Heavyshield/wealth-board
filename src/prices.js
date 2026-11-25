@@ -6,10 +6,9 @@
 import frankfurter from './providers/frankfurter.js';
 import ecb from './providers/ecb.js';
 import goldapi from './providers/goldapi.js';
-import twelvedata from './providers/twelvedata.js';
 import yahooProxy from './providers/yahoo-proxy.js';
 
-export const PROVIDERS = Object.fromEntries([frankfurter, ecb, goldapi, twelvedata, yahooProxy].map((p) => [p.id, p]));
+export const PROVIDERS = Object.fromEntries([frankfurter, ecb, goldapi, yahooProxy].map((p) => [p.id, p]));
 
 const SETTINGS_KEY = 'wb.settings.prices';
 const CACHE_KEY = 'wb.cache.prices';

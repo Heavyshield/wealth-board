@@ -8,8 +8,8 @@ Footer must always read: "Outil de suivi, pas un conseil en investissement."
 - [x] (a) data model, validation, holdings table, filters, inline edit, local working copy, tests
 - [x] (b) KPIs (hero total, latent P&L, day change with coverage, price freshness) + 4 charts
 - [x] (c) rules engine (config.rules), constraint meters (config.constraints), "À revoir" panel, editable metrics
-- [x] (d) price providers: FX (Frankfurter > ECB), metals (gold-api), quotes (own Yahoo proxy > Twelve Data), cache, fallback
-- [ ] (e) Boursorama CSV import with diff preview
+- [x] (d) price providers: FX (Frankfurter > ECB), metals (gold-api), quotes (own Yahoo proxy), cache, fallback
+- [x] (e) CSV position import (Boursorama profile) with column mapping, diff preview, per-line apply
 - [ ] (f) Google Drive sync (GIS, drive.file) + File System Access fallback + conflicts
 - [ ] (g) "Export for Claude" + snapshot button
 
@@ -29,6 +29,10 @@ src/prices.js       orchestration: needs, localStorage cache + TTL, fallback cha
 src/providers/*.js  one adapter per source (common.js = interface + helpers); pure parse() tested on real fixtures
 tools/yahoo-proxy-worker.js  Cloudflare Worker the user deploys (Yahoo has no CORS); self-contained
 tests/prices.test.js + tests/fixtures/*.json  real API responses captured 2026-11-25
+src/csv.js          tolerant CSV: UTF-8/BOM or Windows-1252, ; , tab, RFC 4180 quotes, FR/EN numbers
+src/importer.js     column mapping via config.imports, diff vs one envelope, applyImport (changelog per change)
+src/import-ui.js    "Importer CSV" dialog: format, envelope, file -> mapping + diff with checkboxes -> apply
+tests/import.test.js + tests/fixtures/boursorama-fake-*.csv  FAKE exports (EN/FR headers, cp1252, missing column)
 src/format.js       fr-FR formatting + parsing of typed numbers
 data/*.json         portfolio / config / history (repo copy = FAKE sample data only)
 schema/*.schema.json  one schema per data file
@@ -108,6 +112,8 @@ to detect that a file changed under a local copy and asks the user instead of ov
   Add a changelog entry (`author: "claude"`), bump `revision` and `updated_at`.
 - **Add an asset class / envelope**: add to `config.asset_classes` / `config.envelopes` (pick `pricing`).
 - **Add a rule**: append to `config.rules.items` (any metric name); add that metric + `as_of` to the holdings' `metrics`.
+- **Import a new CSV format** (other broker): add a profile to `config.imports` (`columns` aliases per field,
+  `required`, `update_fields`, `envelope_default`); test with a FAKE file in tests/fixtures (only CSVs allowed there).
 - **Add a constraint**: append to `config.constraints` with one of the 3 types above.
 - **Add a price provider**: CORS-test it from a browser page on localhost first. Then one file in
   `src/providers/` (interface in common.js: id, kind, needs, batch, minIntervalMs, fetch, pure parse), register it in
@@ -129,6 +135,17 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - Must be served over http(s) (file:// blocks module/JSON loading; the page says so).
 - Local dev: `python -m http.server 8770` in the repo, open http://localhost:8770/ and /tests/.
 
+## CSV import (src/importer.js)
+- Real Boursorama export format is not publicly documented (checked 2026-11-25): "Positions" tab -> "Exporter en CSV",
+  one account per file, name `export-positions-comptables-dd-MM-yyyy_hh-mm-ss.csv`. Columns are matched by alias
+  (`config.imports.boursorama.columns`, case/accent-insensitive); the dialog shows the mapping found. If a column is
+  not recognised, add its exact header to the aliases -- never hardcode in JS.
+- Diff is per envelope and only for quote-priced classes (cash/accounts/metals untouched). Match by ISIN, then name.
+  Added lines get id `<envelope>-<name-slug>`, class guessed from `etf_name_pattern`, NO ticker (to fill for live price).
+- Deletions are ticked by default, except when deletions >= matched lines (wrong envelope / partial export): warning,
+  all unticked. A deleted line is kept in full in the changelog (`old`). File prices become `last_price` only if newer
+  (as_of = date in the file name, else the file's modification time).
+
 ## Prices (src/prices.js)
 - Chains per kind in `config.providers` {fx, spot, quote, ttl_minutes, auto_refresh}. A provider whose setting is
   missing (`needs`) is skipped and reported "non configuré". Every failure is listed under "Détails"; nothing is invented.
@@ -148,7 +165,7 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - Metals: `https://api.gold-api.com/price/XAU/EUR` (per oz, any currency, CORS ok, no key).
 - Blocked from the browser (no CORS): Yahoo, Stooq, Boerse Frankfurt, Nasdaq Nordic, EODHD, Swissquote.
   Euronext live endpoints answer but the payload is encrypted. -> Yahoo only through tools/yahoo-proxy-worker.js.
-- Equities: Twelve Data free plan (key tested 2026-11-25) covers **US only**: Euronext Paris needs Grow,
-  Swiss needs Pro, Stockholm/Oslo/Copenhagen symbols refused. Used as US fallback after the proxy.
-  The key is never stored in the repo (localStorage only).
+- Equities: only the user's Yahoo proxy (`https://wealth-quotes.lasserre1992.workers.dev`, deployed 2026-11-25).
+  Twelve Data was tried (free plan = US only) and removed 2026-11-25 to keep things simple; the app purges any
+  stored key. A provider needing a key would go back through src/providers + `needs` (see "Add a price provider").
   Yahoo and Swissquote are CORS-blocked from the browser.

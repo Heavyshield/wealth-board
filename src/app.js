@@ -8,6 +8,7 @@ import * as viz from './charts.js';
 import { evaluateRules, evaluateConstraints, reviewItems } from './rules.js';
 import { renderReview, renderConstraints } from './review.js';
 import * as prices from './prices.js';
+import { initImport } from './import-ui.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -140,11 +141,12 @@ function persistPrices() {
 }
 
 function initSettings() {
+  const stored = prices.loadSettings();
+  if ('twelvedata_key' in stored) { delete stored.twelvedata_key; prices.saveSettings(stored); } // provider removed 2026-11-25
   const dlg = $('#settings'), form = $('#settings-form');
   $('#open-settings').addEventListener('click', () => {
     const s = prices.loadSettings();
     form.yahoo_proxy_url.value = s.yahoo_proxy_url ?? '';
-    form.twelvedata_key.value = s.twelvedata_key ?? '';
     dlg.showModal();
   });
   $('#settings-cancel').addEventListener('click', () => dlg.close());
@@ -156,7 +158,7 @@ function initSettings() {
   });
   form.addEventListener('submit', () => {
     const url = form.yahoo_proxy_url.value.trim();
-    prices.saveSettings({ yahoo_proxy_url: url || undefined, twelvedata_key: form.twelvedata_key.value.trim() || undefined });
+    prices.saveSettings({ yahoo_proxy_url: url || undefined });
     toast('Réglages enregistrés dans ce navigateur.');
     refreshPrices(true);
   });
@@ -237,6 +239,21 @@ async function main() {
       })));
     if (unknown.length) showErrors({ config: unknown });
     initSettings();
+    initImport({
+      dialog: $('#import'),
+      openButton: $('#open-import'),
+      getState: () => ({ portfolio: app.files.portfolio, config: app.files.config }),
+      onApply: (next, n) => {
+        const errs = data.validateAll({ ...app.files, portfolio: next }, app.schemas);
+        if (errs.portfolio) { toast(`Import refusé : ${errs.portfolio[0].path} : ${errs.portfolio[0].message}`, 'error'); return false; }
+        data.saveWorking('portfolio', next, app.source.portfolio.revision);
+        app.files.portfolio = next;
+        render();
+        toast(`Import appliqué (rév. ${next.revision}) : ${n.added} ajout(s), ${n.changed} modification(s), ${n.removed} suppression(s). Voir le journal.`);
+        if (n.added) refreshPrices(false);
+        return true;
+      },
+    });
     $('#refresh').addEventListener('click', () => refreshPrices(true));
     render();
     if (app.files.config.providers?.auto_refresh) refreshPrices(false);

@@ -3,7 +3,7 @@
 // Provider interface (one file per provider in src/providers/):
 //   export default {
 //     id, kind: 'fx' | 'spot' | 'quote', label,
-//     needs: [settingKey...]              // e.g. ['twelvedata_key']; missing -> provider skipped
+//     needs: [settingKey...]              // e.g. ['yahoo_proxy_url']; missing -> provider skipped
 //     batch: n                            // max symbols per request (quote providers)
 //     async fetch(items, ctx) -> { results: { key: Price }, errors: { key: message } }
 //   }

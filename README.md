@@ -41,10 +41,9 @@ Change (BCE) et métaux fonctionnent sans rien configurer. Pour les actions :
 | Source | Couvre | Réglage |
 |---|---|---|
 | Votre proxy Yahoo (Cloudflare, gratuit) | Paris, Nordiques, Suisse, Londres, US, ETF | URL du proxy |
-| Twelve Data (plan gratuit) | Actions US uniquement, 8 symboles / minute | Clé API |
 | Prix manuel (`manual_price`) | Tout | Toujours prioritaire |
 
-Les réglages (URL, clé) restent dans **ce navigateur** (Réglages) : jamais dans les fichiers ni sur GitHub.
+Le réglage (URL du proxy) reste dans **ce navigateur** (Réglages) : jamais dans les fichiers ni sur GitHub.
 À refaire sur chaque appareil (ordinateur, téléphone).
 
 ### Créer le proxy Yahoo (5 minutes, gratuit)
@@ -63,9 +62,17 @@ Pour en changer : Worker → Settings → Variables → `ALLOWED_ORIGINS` (liste
 
 ### Symboles
 Le champ `ticker` d'une ligne sert pour toutes les sources (format Yahoo : `TTE.PA`, `VOLV-B.ST`, `EQNR.OL`,
-`NOVO-B.CO`, `NESN.SW`, `CW8.PA`, `AAPL`). Si une source attend un autre symbole :
-`"symbols": { "twelvedata": "AAPL" }`. Forcer une source : `"price_source": "quote:twelvedata"` ;
-ne jamais chercher de cours : `"price_source": "manual"`.
+`NOVO-B.CO`, `NESN.SW`, `CW8.PA`, `AAPL`). Ne jamais chercher de cours pour une ligne :
+`"price_source": "manual"` (ou renseigner `manual_price`).
+
+## Importer les positions Boursorama
+1. Boursorama → votre compte (PEA ou CTO) → onglet **Positions** → **Exporter en CSV** (un compte par fichier).
+2. Wealth Board → **Importer CSV** → choisir l'enveloppe → choisir le fichier.
+3. Vérifier : colonnes reconnues, ajouts, modifications (ancien → nouveau), lignes absentes du fichier.
+   Décocher ce qu'il ne faut pas appliquer → **Appliquer**. Chaque changement va dans le journal.
+Le fichier est lu dans le navigateur, rien n'est envoyé. Si une colonne n'est pas reconnue, la fenêtre affiche
+les en-têtes trouvés : ajoutez le nom exact dans `config.json → imports.boursorama.columns`.
+Les nouvelles lignes n'ont pas de ticker : ajoutez-le (format Yahoo, ex. `TTE.PA`) pour le cours en direct.
 
 ## Configuration Google Drive
 À venir (étape f).

@@ -401,6 +401,102 @@
           "type": "boolean"
         }
       }
+    },
+    "imports": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "label",
+          "columns"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "envelope_default": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "isin": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "name": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "quantity": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "unit_cost": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "last_price": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "currency": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ticker": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "required": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "isin",
+                "name",
+                "quantity",
+                "unit_cost",
+                "last_price",
+                "currency",
+                "ticker"
+              ]
+            }
+          },
+          "update_fields": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "quantity",
+                "unit_cost"
+              ]
+            }
+          },
+          "asset_class_default": {
+            "type": "string"
+          },
+          "etf_name_pattern": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "$defs": {
