@@ -3,25 +3,59 @@
   "$id": "config.schema.json",
   "title": "Wealth Board config",
   "type": "object",
-  "required": ["schema_version", "revision", "updated_at", "base_currency", "locale", "envelopes", "asset_classes"],
+  "required": [
+    "schema_version",
+    "revision",
+    "updated_at",
+    "base_currency",
+    "locale",
+    "envelopes",
+    "asset_classes"
+  ],
   "additionalProperties": false,
   "properties": {
-    "schema_version": { "const": 1 },
-    "revision": { "type": "integer", "minimum": 1 },
-    "updated_at": { "type": "string", "format": "date-time" },
-    "base_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
-    "locale": { "type": "string" },
+    "schema_version": {
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "base_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "locale": {
+      "type": "string"
+    },
     "envelopes": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "label"],
+        "required": [
+          "id",
+          "label"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
-          "label": { "type": "string" },
-          "institution": { "type": "string" },
-          "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "institution": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          }
         }
       }
     },
@@ -29,12 +63,27 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "label", "pricing"],
+        "required": [
+          "id",
+          "label",
+          "pricing"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
-          "label": { "type": "string" },
-          "pricing": { "enum": ["quote", "spot", "par"] }
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "pricing": {
+            "enum": [
+              "quote",
+              "spot",
+              "par"
+            ]
+          }
         }
       }
     },
@@ -42,37 +91,94 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "by_country": { "type": "object", "additionalProperties": { "type": "string" } },
+        "by_country": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "by_pricing": {
           "type": "object",
           "additionalProperties": false,
-          "properties": { "par": { "type": "string" }, "spot": { "type": "string" }, "quote": { "type": "string" } }
+          "properties": {
+            "par": {
+              "type": "string"
+            },
+            "spot": {
+              "type": "string"
+            },
+            "quote": {
+              "type": "string"
+            }
+          }
         },
-        "unknown_label": { "type": "string" }
+        "unknown_label": {
+          "type": "string"
+        }
       }
     },
     "allocation_targets": {
       "type": "object",
-      "required": ["group_by", "weights"],
+      "required": [
+        "group_by",
+        "weights"
+      ],
       "additionalProperties": false,
       "properties": {
-        "group_by": { "enum": ["asset_class", "envelope", "currency", "region"] },
-        "tolerance": { "type": "number", "minimum": 0, "maximum": 1 },
-        "weights": { "type": "object", "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 } }
+        "group_by": {
+          "enum": [
+            "asset_class",
+            "envelope",
+            "currency",
+            "region"
+          ]
+        },
+        "tolerance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "weights": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
       }
     },
     "charts": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "max_slices": { "type": "integer", "minimum": 2, "maximum": 8 },
+        "max_slices": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 8
+        },
         "palette": {
           "type": "object",
-          "required": ["light", "dark"],
+          "required": [
+            "light",
+            "dark"
+          ],
           "additionalProperties": false,
           "properties": {
-            "light": { "type": "array", "items": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" } },
-            "dark": { "type": "array", "items": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" } }
+            "light": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            },
+            "dark": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            }
           }
         }
       }
@@ -85,9 +191,18 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "quote": { "type": "number", "minimum": 0 },
-            "spot": { "type": "number", "minimum": 0 },
-            "fx": { "type": "number", "minimum": 0 }
+            "quote": {
+              "type": "number",
+              "minimum": 0
+            },
+            "spot": {
+              "type": "number",
+              "minimum": 0
+            },
+            "fx": {
+              "type": "number",
+              "minimum": 0
+            }
           }
         }
       }
@@ -96,7 +211,176 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "default_columns": { "type": "array", "items": { "type": "string" } }
+        "default_columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sample_data": {
+      "type": "boolean"
+    },
+    "rules": {
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "metrics_max_age_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "label",
+              "metric",
+              "op",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string"
+              },
+              "metric": {
+                "type": "string",
+                "pattern": "^[a-z0-9_]+$"
+              },
+              "op": {
+                "enum": [
+                  "<=",
+                  "<",
+                  ">=",
+                  ">"
+                ]
+              },
+              "value": {
+                "type": "number"
+              },
+              "require_positive": {
+                "type": "boolean"
+              },
+              "applies_to": {
+                "$ref": "#/$defs/scope"
+              },
+              "why": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "label"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "type": {
+            "enum": [
+              "contribution_ceiling",
+              "share_cap",
+              "runway"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "envelope": {
+            "type": "string"
+          },
+          "ceiling": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "warn_ratio": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "group_by": {
+            "enum": [
+              "asset_class",
+              "envelope",
+              "currency",
+              "region"
+            ]
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "max": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "min": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "monthly_budget": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "target_months": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "liquid": {
+            "$ref": "#/$defs/scope"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "asset_class": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "envelope": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags_exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     }
   }

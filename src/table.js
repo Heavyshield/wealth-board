@@ -1,8 +1,12 @@
-// Holdings table: sort, search, filters, column picker, inline edit (quantity, unit_cost, notes).
+// Holdings table: sort, search, filters, column picker, inline edit (quantity, unit_cost, notes, metrics).
 // Column *definitions* live here (presentation); which columns show is config.table.default_columns,
 // overridden per device by the column picker (localStorage "wb.ui.columns").
 
 import * as fmt from './format.js';
+import { RULE_STATUS } from './rules.js';
+
+/** Read a dotted path ("metrics.per") from an object. */
+export const getPath = (obj, path) => path.split('.').reduce((o, k) => o?.[k], obj);
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -21,6 +25,15 @@ export function statusBadge(price, now) {
   const when = price.as_of ? `${fmt.date(price.as_of)} (${fmt.age(price.as_of, now)})` : 'jamais';
   const title = `${STATUS_HELP[price.status]} · source : ${price.source} · mis à jour : ${when}`;
   return `<span class="badge badge-${price.status}" title="${esc(title)}">${STATUS_LABEL[price.status]}</span>`;
+}
+
+function ruleBadge(r) {
+  const ev = r.rules;
+  if (!ev || ev.status === 'na') return '<span class="sub">—</span>';
+  const lines = ev.results.map((x) => `${x.state === 'pass' ? '✓' : x.state === 'fail' ? '✗' : '?'} ${x.rule.label}${x.value !== null ? ` (${fmt.number(x.value, 2)})` : ' : non saisi'}`);
+  if (ev.metrics_age_days !== null) lines.push(`Métriques : ${ev.metrics_age_days} j`);
+  const icon = { ok: '✓', breach: '✗', incomplete: '?', stale: '⏱' }[ev.status];
+  return `<span class="rbadge rbadge-${ev.status}" title="${esc(lines.join(' · '))}"><span aria-hidden="true">${icon}</span> ${RULE_STATUS[ev.status].label}</span>`;
 }
 
 function columns(ctx) {
@@ -48,6 +61,21 @@ function columns(ctx) {
       cell: (r) => `<span class="${signCls(r.pnl_pct)}">${fmt.pct(r.pnl_pct)}</span>` },
     { id: 'pnl_fx', label: 'dont change', num: true, sort: (r) => r.pnl_fx_base ?? -Infinity,
       cell: (r) => (r.h.currency === base ? '—' : `<span class="${signCls(r.pnl_fx_base)}">${fmt.signedMoney(r.pnl_fx_base, base)}</span>${r.cost_fx_known ? '' : '<span class="sub" title="Ajouter cost_fx_rate pour isoler l\'effet de change">taux d\'achat inconnu</span>'}`) },
+    { id: 'rules', label: 'Règles', sort: (r) => RULE_STATUS[r.rules?.status ?? 'na'].severity,
+      cell: (r) => ruleBadge(r) },
+    ...[['per', 'PER'], ['pcf', 'P/CF'], ['net_debt_ebitda', 'DN/EBITDA']].map(([k, label]) => ({
+      id: `m_${k}`, path: `metrics.${k}`, label, num: true, edit: 'number', optional: true,
+      sort: (r) => r.h.metrics?.[k] ?? -Infinity,
+      cell: (r) => {
+        const res = r.rules?.results.find((x) => x.rule.metric === k);
+        const v = r.h.metrics?.[k];
+        return v === undefined ? (res ? '<span class="sub">à saisir</span>' : '—')
+          : `<span class="${res?.state === 'fail' ? 'neg' : ''}">${fmt.number(v, 2)}</span>`;
+      },
+    })),
+    { id: 'm_as_of', path: 'metrics.as_of', label: 'Métriques au', edit: 'date', optional: true,
+      sort: (r) => r.h.metrics?.as_of ?? '',
+      cell: (r) => (r.h.metrics?.as_of ? `${fmt.date(r.h.metrics.as_of)}${r.rules?.metrics_stale ? ' <span class="sub">ancien</span>' : ''}` : '—') },
     { id: 'notes', label: 'Notes', edit: 'text', sort: (r) => r.h.notes, cell: (r) => esc(r.h.notes) },
     { id: 'updated_at', label: 'Modifié', sort: (r) => r.h.updated_at, cell: (r) => fmt.date(r.h.updated_at) },
   ];
@@ -84,6 +112,7 @@ export class HoldingsTable {
       if (filters.currency && h.currency !== filters.currency) return false;
       if (filters.tag && !h.tags.includes(filters.tag)) return false;
       if (filters.status && r.price.status !== filters.status) return false;
+      if (filters.rule && (r.rules?.status ?? 'na') !== filters.rule) return false;
       if (q && ![h.name, h.ticker, h.isin, h.notes, ...h.tags].some((s) => s?.toLowerCase().includes(q))) return false;
       return true;
     });
@@ -111,6 +140,7 @@ export class HoldingsTable {
       select('currency', 'Devise', uniq(this.rows.map((r) => r.h.currency)).map((c) => [c, c])),
       select('tag', 'Tag', uniq(this.rows.flatMap((r) => r.h.tags)).map((t) => [t, t])),
       select('status', 'Prix', Object.entries(STATUS_LABEL)),
+      select('rule', 'Règles', Object.entries(RULE_STATUS).map(([k, v]) => [k, k === 'na' ? 'Non concerné' : v.label])),
     ].join('');
   }
 
@@ -128,17 +158,23 @@ export class HoldingsTable {
 
     const body = rows.map((r) => {
       const tds = cols.map((c) => {
-        const pendingVal = this.edits[r.id]?.[c.id];
-        if (editing && c.edit) {
-          const val = pendingVal ?? r.h[c.id];
+        const path = c.path ?? c.id;
+        const pendingVal = this.edits[r.id]?.[path];
+        // Metric columns are editable only on lines a rule applies to.
+        if (editing && c.edit && !(c.optional && (r.rules?.status ?? 'na') === 'na')) {
+          const val = pendingVal !== undefined ? pendingVal : getPath(r.h, path);
+          const shown = val === null || val === undefined ? '' : String(val);
+          const attrs = `data-edit="${esc(path)}" data-kind="${c.edit}" data-id="${esc(r.id)}" aria-label="${esc(c.label)} ${esc(r.h.name)}"`;
           const input = c.edit === 'number'
-            ? `<input type="text" inputmode="decimal" data-edit="${c.id}" data-id="${esc(r.id)}" value="${esc(String(val).replace('.', ','))}" aria-label="${esc(c.label)} ${esc(r.h.name)}">`
-            : `<input type="text" data-edit="${c.id}" data-id="${esc(r.id)}" value="${esc(val)}" aria-label="${esc(c.label)} ${esc(r.h.name)}">`;
+            ? `<input type="text" inputmode="decimal" ${attrs} value="${esc(shown.replace('.', ','))}"${c.optional ? ' placeholder="—"' : ''}>`
+            : c.edit === 'date'
+              ? `<input type="date" ${attrs} value="${esc(shown)}">`
+              : `<input type="text" ${attrs} value="${esc(shown)}">`;
           return `<td data-label="${esc(c.label)}" class="${c.num ? 'num' : ''}${pendingVal !== undefined ? ' dirty' : ''}">${input}</td>`;
         }
         return `<td data-label="${esc(c.label)}" class="${c.num ? 'num' : ''}">${c.cell(r)}</td>`;
       }).join('');
-      return `<tr data-row="${esc(r.id)}">${tds}</tr>`;
+      return `<tr data-row="${esc(r.id)}" id="row-${esc(r.id)}">${tds}</tr>`;
     }).join('');
 
     const picker = this.cols.filter((c) => !c.always).map((c) =>
@@ -194,20 +230,25 @@ export class HoldingsTable {
   }
 
   recordEdit(input) {
-    const { id, edit: field } = input.dataset;
+    const { id, edit: field, kind } = input.dataset;
     const h = this.rows.find((r) => r.id === id).h;
-    let value = input.value;
-    if (field !== 'notes') {
-      value = fmt.parseNumber(value);
-      if (!Number.isFinite(value) || value < 0) {
-        input.setCustomValidity('Nombre positif attendu (ex. 1 234,5)');
-        input.reportValidity();
-        return;
+    const isMetric = field.startsWith('metrics.');
+    let value = input.value.trim();
+    const invalid = (msg) => { input.setCustomValidity(msg); input.reportValidity(); };
+    if (kind === 'number') {
+      if (value === '' && isMetric) value = null; // empty metric = remove it
+      else {
+        value = fmt.parseNumber(value);
+        // Metrics may be negative (loss-making PER, net cash); quantities and costs may not.
+        if (!Number.isFinite(value) || (!isMetric && value < 0)) return invalid(isMetric ? 'Nombre attendu (ex. 12,5 ou -0,4)' : 'Nombre positif attendu (ex. 1 234,5)');
       }
-      input.setCustomValidity('');
+    } else if (kind === 'date') {
+      if (value === '') value = null;
     }
+    input.setCustomValidity('');
+    const current = getPath(h, field) ?? null;
     this.edits[id] ??= {};
-    if (value === h[field]) delete this.edits[id][field];
+    if (value === current) delete this.edits[id][field];
     else this.edits[id][field] = value;
     if (!Object.keys(this.edits[id]).length) delete this.edits[id];
     // Re-render but keep focus where the user tabbed to.
@@ -215,6 +256,8 @@ export class HoldingsTable {
     this.render();
     if (next.edit) this.root.querySelector(`[data-edit="${next.edit}"][data-id="${CSS.escape(next.id)}"]`)?.focus();
   }
+
+  resetFilters() { this.state.filters = {}; this.state.search = ''; this.render(); }
 
   clearEdits() { this.edits = {}; this.state.editMode = false; this.render(); }
 }

@@ -3,28 +3,58 @@
   "$id": "portfolio.schema.json",
   "title": "Wealth Board portfolio",
   "type": "object",
-  "required": ["schema_version", "revision", "updated_at", "holdings", "changelog"],
+  "required": [
+    "schema_version",
+    "revision",
+    "updated_at",
+    "holdings",
+    "changelog"
+  ],
   "additionalProperties": false,
   "properties": {
-    "schema_version": { "const": 1 },
-    "revision": { "type": "integer", "minimum": 1 },
-    "updated_at": { "type": "string", "format": "date-time" },
-    "sample_data": { "type": "boolean" },
+    "schema_version": {
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sample_data": {
+      "type": "boolean"
+    },
     "market_snapshot": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "fx": {
           "type": "object",
-          "required": ["base", "as_of", "rates"],
+          "required": [
+            "base",
+            "as_of",
+            "rates"
+          ],
           "additionalProperties": false,
           "properties": {
-            "base": { "$ref": "#/$defs/currency" },
-            "as_of": { "type": "string", "format": "date-time" },
-            "source": { "type": "string" },
+            "base": {
+              "$ref": "#/$defs/currency"
+            },
+            "as_of": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "source": {
+              "type": "string"
+            },
             "rates": {
               "type": "object",
-              "additionalProperties": { "type": "number", "exclusiveMinimum": 0 }
+              "additionalProperties": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
             }
           }
         },
@@ -32,97 +62,298 @@
           "type": "object",
           "additionalProperties": {
             "type": "object",
-            "required": ["value", "currency", "per", "as_of"],
+            "required": [
+              "value",
+              "currency",
+              "per",
+              "as_of"
+            ],
             "additionalProperties": false,
             "properties": {
-              "value": { "type": "number", "exclusiveMinimum": 0 },
-              "prev_close": { "type": "number", "exclusiveMinimum": 0 },
-              "currency": { "$ref": "#/$defs/currency" },
-              "per": { "enum": ["oz", "g", "kg"] },
-              "as_of": { "type": "string", "format": "date-time" },
-              "source": { "type": "string" }
+              "value": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "prev_close": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "currency": {
+                "$ref": "#/$defs/currency"
+              },
+              "per": {
+                "enum": [
+                  "oz",
+                  "g",
+                  "kg"
+                ]
+              },
+              "as_of": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "source": {
+                "type": "string"
+              }
             }
           }
         }
       }
     },
-    "holdings": { "type": "array", "items": { "$ref": "#/$defs/holding" } },
-    "changelog": { "type": "array", "items": { "$ref": "#/$defs/change" } }
+    "holdings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/holding"
+      }
+    },
+    "changelog": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "accounts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "envelope",
+          "as_of"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "envelope": {
+            "type": "string"
+          },
+          "contributions": {
+            "type": "number",
+            "minimum": 0
+          },
+          "opened": {
+            "type": "string",
+            "format": "date"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    }
   },
   "$defs": {
-    "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
-    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
     "price": {
       "type": "object",
-      "required": ["value", "as_of"],
+      "required": [
+        "value",
+        "as_of"
+      ],
       "additionalProperties": false,
       "properties": {
-        "value": { "type": "number", "exclusiveMinimum": 0 },
-        "prev_close": { "type": "number", "exclusiveMinimum": 0 },
-        "currency": { "$ref": "#/$defs/currency" },
-        "as_of": { "type": "string", "format": "date-or-date-time" },
-        "source": { "type": "string" }
+        "value": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "prev_close": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "currency": {
+          "$ref": "#/$defs/currency"
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date-or-date-time"
+        },
+        "source": {
+          "type": "string"
+        }
       }
     },
     "holding": {
       "type": "object",
-      "required": ["id", "name", "envelope", "asset_class", "quantity", "unit_cost", "currency", "price_source", "tags", "notes", "updated_at"],
+      "required": [
+        "id",
+        "name",
+        "envelope",
+        "asset_class",
+        "quantity",
+        "unit_cost",
+        "currency",
+        "price_source",
+        "tags",
+        "notes",
+        "updated_at"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "name": { "type": "string", "minLength": 1 },
-        "envelope": { "type": "string" },
-        "asset_class": { "type": "string" },
-        "ticker": { "type": "string" },
-        "isin": { "type": "string", "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$" },
-        "region": { "type": "string" },
-        "quantity": { "type": "number", "minimum": 0 },
-        "unit_cost": { "type": "number", "minimum": 0 },
-        "cost_fx_rate": { "type": "number", "exclusiveMinimum": 0 },
-        "currency": { "$ref": "#/$defs/currency" },
-        "price_source": { "type": "string" },
-        "manual_price": { "$ref": "#/$defs/price" },
-        "last_price": { "$ref": "#/$defs/price" },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "envelope": {
+          "type": "string"
+        },
+        "asset_class": {
+          "type": "string"
+        },
+        "ticker": {
+          "type": "string"
+        },
+        "isin": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$"
+        },
+        "region": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cost_fx_rate": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "currency": {
+          "$ref": "#/$defs/currency"
+        },
+        "price_source": {
+          "type": "string"
+        },
+        "manual_price": {
+          "$ref": "#/$defs/price"
+        },
+        "last_price": {
+          "$ref": "#/$defs/price"
+        },
         "metal": {
           "type": "object",
-          "required": ["code", "weight", "unit", "purity"],
+          "required": [
+            "code",
+            "weight",
+            "unit",
+            "purity"
+          ],
           "additionalProperties": false,
           "properties": {
-            "code": { "enum": ["XAU", "XAG", "XPT", "XPD"] },
-            "weight": { "type": "number", "exclusiveMinimum": 0 },
-            "unit": { "enum": ["g", "oz", "kg"] },
-            "purity": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+            "code": {
+              "enum": [
+                "XAU",
+                "XAG",
+                "XPT",
+                "XPD"
+              ]
+            },
+            "weight": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "unit": {
+              "enum": [
+                "g",
+                "oz",
+                "kg"
+              ]
+            },
+            "purity": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            }
           }
         },
-        "tags": { "type": "array", "items": { "type": "string" } },
-        "notes": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "string"
+        },
         "metrics": {
           "type": "object",
-          "required": ["as_of"],
-          "additionalProperties": false,
+          "required": [
+            "as_of"
+          ],
+          "additionalProperties": {
+            "type": "number"
+          },
           "properties": {
-            "per": { "type": "number" },
-            "pcf": { "type": "number" },
-            "net_debt_ebitda": { "type": "number" },
-            "as_of": { "type": "string", "format": "date" }
+            "as_of": {
+              "type": "string",
+              "format": "date"
+            },
+            "source": {
+              "type": "string"
+            }
           }
         },
-        "updated_at": { "type": "string", "format": "date-or-date-time" }
+        "updated_at": {
+          "type": "string",
+          "format": "date-or-date-time"
+        }
       }
     },
     "change": {
       "type": "object",
-      "required": ["date", "target", "field", "old", "new", "author"],
+      "required": [
+        "date",
+        "target",
+        "field",
+        "old",
+        "new",
+        "author"
+      ],
       "additionalProperties": false,
       "properties": {
-        "date": { "type": "string", "format": "date-time" },
-        "file": { "enum": ["portfolio", "config", "history"] },
-        "target": { "type": "string" },
-        "field": { "type": "string" },
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "file": {
+          "enum": [
+            "portfolio",
+            "config",
+            "history"
+          ]
+        },
+        "target": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
         "old": {},
         "new": {},
-        "author": { "enum": ["user", "claude"] },
-        "note": { "type": "string" }
+        "author": {
+          "enum": [
+            "user",
+            "claude"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
       }
     }
   }

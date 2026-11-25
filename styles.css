@@ -73,6 +73,39 @@ select, input[type="search"], input[type="text"] { background: var(--surface); b
 .seg-live { background: var(--live); } .seg-stale { background: var(--stale); } .seg-manual { background: var(--manual); }
 .seg-balance { background: var(--balance); } .seg-missing { background: var(--missing); }
 
+/* Stage c: review list, constraint meters, rule badges.
+   Status colors are fixed (not themed) and always paired with an icon + text label. */
+:root { --st-good: #0ca30c; --st-warn: #fab219; --st-crit: #d03b3b; --st-info: #6b7380; }
+.decide { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; align-items: start; }
+.constraints { display: grid; gap: 12px; }
+.review-list { list-style: none; margin: 0; padding: 0; }
+.review-list li { display: grid; grid-template-columns: 22px minmax(0, auto) auto 1fr; gap: 4px 10px; align-items: baseline;
+  padding: 7px 8px; border-left: 3px solid var(--st-info); border-bottom: 1px solid var(--border); }
+.review-list li.sev-crit { border-left-color: var(--st-crit); }
+.review-list li.sev-warn { border-left-color: var(--st-warn); }
+.review-list .detail { color: var(--muted); font-size: .88rem; }
+.review-list .kind { font-size: .75rem; color: var(--muted); border: 1px solid var(--border); border-radius: 10px; padding: 0 7px; }
+.linklike { border: 0; background: none; padding: 0; color: var(--text); font-weight: 600; text-align: left; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
+.linklike:hover { text-decoration-color: var(--accent); }
+.card > button[data-more] { margin-top: 8px; }
+.constraint-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.state { font-size: .78rem; font-weight: 600; border-radius: 4px; padding: 1px 7px; color: #0b0b0b; white-space: nowrap; }
+.state-good { background: var(--st-good); } .state-warn { background: var(--st-warn); }
+.state-crit { background: var(--st-crit); color: #fff; } .state-info { background: var(--st-info); color: #fff; }
+.meter { position: relative; height: 8px; border-radius: 4px; margin: 10px 0 6px; overflow: visible; }
+.meter-fill { display: block; height: 100%; border-radius: 4px; }
+.meter-good { background: color-mix(in srgb, var(--st-good) 22%, transparent); } .meter-good .meter-fill { background: var(--st-good); }
+.meter-warn { background: color-mix(in srgb, var(--st-warn) 25%, transparent); } .meter-warn .meter-fill { background: var(--st-warn); }
+.meter-crit { background: color-mix(in srgb, var(--st-crit) 22%, transparent); } .meter-crit .meter-fill { background: var(--st-crit); }
+.meter-info { background: color-mix(in srgb, var(--st-info) 22%, transparent); } .meter-info .meter-fill { background: var(--st-info); }
+.meter-mark { position: absolute; top: -4px; width: 2px; height: 16px; background: var(--text); border-radius: 1px; transform: translateX(-1px); }
+.rbadge { display: inline-block; white-space: nowrap; border-radius: 4px; padding: 0 6px; font-size: .75rem; font-weight: 600; color: #0b0b0b; }
+.rbadge-ok { background: var(--st-good); } .rbadge-breach { background: var(--st-crit); color: #fff; }
+.rbadge-incomplete, .rbadge-stale { background: var(--st-warn); }
+.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 3px transparent; } }
+@media (prefers-reduced-motion: reduce) { .flash { animation: none; outline: 3px solid var(--accent); } }
+
 /* Chart cards */
 .viz { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .card h2 { margin: 0; font-size: 1rem; }
@@ -141,6 +174,7 @@ table.holdings { width: 100%; border-collapse: collapse; font-variant-numeric: t
 @media (max-width: 1100px) {
   .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .viz { grid-template-columns: minmax(0, 1fr); }
+  .decide { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Phone: rows become cards, each cell labelled. */
@@ -151,6 +185,8 @@ table.holdings { width: 100%; border-collapse: collapse; font-variant-numeric: t
   .summary { grid-template-columns: minmax(0, 1fr); }
   .top-actions button { font-size: .85rem; padding: 5px 8px; }
   .flag-text { display: none; }
+  .review-list li { grid-template-columns: 22px 1fr auto; }
+  .review-list .detail { grid-column: 2 / -1; }
   .donut-box { height: 200px; }
   .top-actions { margin-left: 0; }
   .filter.search input { min-width: 0; width: 100%; }

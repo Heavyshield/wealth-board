@@ -5,6 +5,8 @@ import * as fmt from './format.js';
 import { valueHoldings } from './valuation.js';
 import { HoldingsTable } from './table.js';
 import * as viz from './charts.js';
+import { evaluateRules, evaluateConstraints, reviewItems } from './rules.js';
+import { renderReview, renderConstraints } from './review.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -68,8 +70,11 @@ function renderCharts() {
 function render() {
   const { portfolio, config } = app.files;
   const now = new Date();
-  const rows = valueHoldings({ portfolio, config, now });
+  const rows = evaluateRules(valueHoldings({ portfolio, config, now }), config, now);
   app.rows = rows;
+  const constraints = evaluateConstraints(rows, portfolio, config);
+  renderReview($('#review'), reviewItems(rows, constraints, config, fmt), { onSelect: focusTarget });
+  renderConstraints($('#constraints'), constraints);
   $('#sample-banner').hidden = !portfolio.sample_data;
   $('#rev').textContent = `portfolio rév. ${portfolio.revision}${data.hasWorking('portfolio') ? ' · copie locale' : ''}`;
   viz.renderKpis($('#summary'), rows, config, app.files.history);
@@ -77,11 +82,30 @@ function render() {
   app.table.setData(rows, config, now);
 }
 
+/** Jump from a review item to what it is about, briefly highlighted. */
+function focusTarget(target) {
+  let el;
+  if (target === 'targets') el = $('#card-targets');
+  else if (target.startsWith('constraint:')) el = document.getElementById(`constraint-${target.slice(11)}`);
+  else {
+    if (!document.getElementById(`row-${target}`)) app.table.resetFilters();
+    el = document.getElementById(`row-${target}`);
+  }
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+
 function onEdits(kind, edits) {
   if (kind !== 'save') return;
   const next = data.applyEdits(app.files.portfolio, edits, 'user');
   const errs = data.validateAll({ ...app.files, portfolio: next }, app.schemas);
-  if (errs.portfolio) { showErrors(errs); toast('Modification refusée : données invalides.', 'error'); return; }
+  if (errs.portfolio) {
+    const e = errs.portfolio[0];
+    const hint = /metrics.*as_of|« as_of »/.test(`${e.path} ${e.message}`) ? ' Renseignez la date « Métriques au ».' : '';
+    toast(`Modification refusée : ${e.path} : ${e.message}.${hint}`, 'error');
+    return;
+  }
   data.saveWorking('portfolio', next, app.source.portfolio.revision);
   app.files.portfolio = next;
   app.table.clearEdits();

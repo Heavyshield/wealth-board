@@ -39,6 +39,21 @@ export function crossCheck(portfolio, config) {
     if (!cls) errors.push({ path: `${at}.asset_class`, message: `classe « ${h.asset_class} » absente de config.asset_classes` });
     if (cls?.pricing === 'spot' && !h.metal) errors.push({ path: at, message: 'ligne métal sans bloc « metal » (code, poids, unité, pureté)' });
   });
+  const scopeErrs = (scope, at) => {
+    for (const k of scope?.asset_class ?? []) if (!classes.has(k)) errors.push({ path: at, message: `classe « ${k} » inconnue` });
+    for (const k of scope?.envelope ?? []) if (!envelopes.has(k)) errors.push({ path: at, message: `enveloppe « ${k} » inconnue` });
+  };
+  (config.rules?.items ?? []).forEach((r, i) => scopeErrs(r.applies_to, `config.rules.items[${i}] (${r.id})`));
+  (config.constraints ?? []).forEach((c, i) => {
+    const at = `config.constraints[${i}] (${c.id})`;
+    const need = { contribution_ceiling: ['envelope', 'ceiling'], share_cap: ['group_by', 'keys'], runway: ['monthly_budget', 'target_months'] }[c.type] ?? [];
+    for (const k of need) if (c[k] === undefined) errors.push({ path: at, message: `champ « ${k} » obligatoire pour le type ${c.type}` });
+    if (c.envelope && !envelopes.has(c.envelope)) errors.push({ path: at, message: `enveloppe « ${c.envelope} » inconnue` });
+    scopeErrs(c.liquid, at);
+  });
+  (portfolio.accounts ?? []).forEach((a, i) => {
+    if (!envelopes.has(a.envelope)) errors.push({ path: `accounts[${i}]`, message: `enveloppe « ${a.envelope} » inconnue` });
+  });
   const t = config.allocation_targets;
   if (t) {
     const sum = Object.values(t.weights).reduce((a, b) => a + b, 0);
@@ -97,8 +112,19 @@ export function dropWorking(file) { localStorage.removeItem(WORKING_KEY(file)); 
 
 export function hasWorking(file) { return localStorage.getItem(WORKING_KEY(file)) !== null; }
 
+const getPath = (obj, path) => path.split('.').reduce((o, k) => o?.[k], obj);
+
+/** Set a dotted path; `null` deletes the key. Creates intermediate objects. */
+function setPath(obj, path, value) {
+  const keys = path.split('.');
+  const last = keys.pop();
+  const parent = keys.reduce((o, k) => (o[k] ??= {}), obj);
+  if (value === null) delete parent[last];
+  else parent[last] = value;
+}
+
 /**
- * Apply pending edits to the portfolio. `edits` = { holdingId: { field: newValue } }.
+ * Apply pending edits to the portfolio. Fields may be dotted paths ("metrics.per"). `edits` = { holdingId: { field: newValue } }.
  * Returns a NEW portfolio with revision+1, updated_at, changelog entries appended.
  */
 export function applyEdits(portfolio, edits, author = 'user', now = new Date()) {
@@ -108,11 +134,13 @@ export function applyEdits(portfolio, edits, author = 'user', now = new Date()) 
     const h = next.holdings.find((x) => x.id === id);
     if (!h) continue;
     for (const [field, value] of Object.entries(fields)) {
-      if (h[field] === value) continue;
-      next.changelog.push({ date, file: 'portfolio', target: id, field, old: h[field] ?? null, new: value, author });
-      h[field] = value;
+      const old = getPath(h, field) ?? null;
+      if (old === value) continue;
+      next.changelog.push({ date, file: 'portfolio', target: id, field, old, new: value, author });
+      setPath(h, field, value);
       h.updated_at = date;
     }
+    if (h.metrics && Object.keys(h.metrics).every((k) => k === 'as_of' || k === 'source')) delete h.metrics; // no metric left
   }
   next.revision = portfolio.revision + 1;
   next.updated_at = date;

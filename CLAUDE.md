@@ -7,7 +7,7 @@ Footer must always read: "Outil de suivi, pas un conseil en investissement."
 ## Status (stages)
 - [x] (a) data model, validation, holdings table, filters, inline edit, local working copy, tests
 - [x] (b) KPIs (hero total, latent P&L, day change with coverage, price freshness) + 4 charts
-- [ ] (c) rules engine + constraint widgets (rules in config.json only)
+- [x] (c) rules engine (config.rules), constraint meters (config.constraints), "À revoir" panel, editable metrics
 - [ ] (d) price providers (adapter per provider, fallback chain, localStorage TTL cache)
 - [ ] (e) Boursorama CSV import with diff preview
 - [ ] (f) Google Drive sync (GIS, drive.file) + File System Access fallback + conflicts
@@ -23,6 +23,8 @@ src/schema.js       minimal JSON Schema validator (subset), French error message
 src/valuation.js    pure valuation: prices, FX, metals, P&L split, totals in integer cents
 src/table.js        holdings table (column defs, sort, filters, picker, inline edit)
 src/charts.js       KPI tiles + charts (allocation donut, history line, actual vs target, P&L bars)
+src/rules.js        pure: rule status per line, constraint evaluation, ranked review items
+src/review.js       UI: "À revoir" list (click = jump to the line) + constraint meters
 src/format.js       fr-FR formatting + parsing of typed numbers
 data/*.json         portfolio / config / history (repo copy = FAKE sample data only)
 schema/*.schema.json  one schema per data file
@@ -44,6 +46,10 @@ to detect that a file changed under a local copy and asks the user instead of ov
   `currency`, `price_source`, `manual_price?` `{value, as_of, currency?, source?}`,
   `last_price?` (last known market price; optional `prev_close` enables the day change), `metal?` `{code, weight, unit: g|oz|kg, purity 0..1}`,
   `tags[]`, `notes`, `metrics?` `{per, pcf, net_debt_ebitda, as_of}`, `updated_at`.
+- `accounts[]` (optional): `{ envelope, contributions?, opened?, as_of, notes? }` -- facts per envelope,
+  e.g. total PEA contributions (not the value) for the ceiling widget.
+- `metrics` may hold any numeric metric (`per`, `pcf`, `net_debt_ebitda`, `dividend_yield`...) + required `as_of`
+  (date of the financial data, never invented) + optional `source`.
 - `changelog[]`: `{ date, file, target, field, old, new, author: "user"|"claude", note? }`.
 
 ### config.json
@@ -51,7 +57,20 @@ to detect that a file changed under a local copy and asks the user instead of ov
 `asset_classes[] {id,label,pricing: quote|spot|par}`, `regions.by_country` (ISIN prefix -> label),
 `regions.by_pricing` (label for par / spot lines, e.g. Liquidités / Métaux), `prices.stale_after_hours {quote,spot,fx}`,
 `table.default_columns`, `allocation_targets {group_by, tolerance, weights}` (weights sum to 1, keys must exist),
-`charts {max_slices, palette {light[], dark[]}}`.
+`charts {max_slices, palette {light[], dark[]}}`, `sample_data` (the commit hook requires it on every data file),
+`rules {metrics_max_age_days, items[]}`, `constraints[]` (see below).
+
+## Rules and constraints (src/rules.js) -- JSON only, no code
+- Rule: `{ id, label, metric, op: <=|<|>=|>, value, require_positive?, applies_to? {asset_class[], envelope[], tags_exclude[]}, why? }`.
+  `require_positive`: a value <= 0 fails (loss-making PER). Missing metric -> "À compléter", never a pass.
+  Line status, worst wins: breach > incomplete > stale (metrics older than metrics_max_age_days) > ok; `na` = no rule applies.
+- Constraint types:
+  - `contribution_ceiling` `{envelope, ceiling, warn_ratio?}` -> reads `portfolio.accounts[envelope].contributions`.
+  - `share_cap` `{group_by, keys[], max?, min?}` -> share of total value; breach above max, warn below min.
+  - `runway` `{monthly_budget, target_months, liquid: scope}` -> months = liquid value / budget; warn < target, breach < half.
+- "À revoir" = rule breaches, missing/stale metrics, missing/stale prices, missing FX, constraints not OK,
+  allocation gaps beyond tolerance; sorted by severity (3 critique, 2 à surveiller, 1 info) then money at stake.
+- Wording stays descriptive (gaps, ratios), never "buy/sell": this is a tracking tool, not advice.
 
 ### history.json
 `snapshots[] {date, base_currency, total, cost?, by_envelope?, by_asset_class?, by_currency?, live_share?, note?}`.
@@ -84,7 +103,8 @@ to detect that a file changed under a local copy and asks the user instead of ov
   Metals: `asset_class: "metal"`, `price_source: "spot"`, a `metal` block; one line per physical item type.
   Add a changelog entry (`author: "claude"`), bump `revision` and `updated_at`.
 - **Add an asset class / envelope**: add to `config.asset_classes` / `config.envelopes` (pick `pricing`).
-- **Add a rule** (stage c): config only, never code.
+- **Add a rule**: append to `config.rules.items` (any metric name); add that metric + `as_of` to the holdings' `metrics`.
+- **Add a constraint**: append to `config.constraints` with one of the 3 types above.
 - **Add a price provider** (stage d): one file in `src/providers/`, common interface; CORS-test first.
 - **Change the data shape**: update the schema, `crossCheck` in data.js if needed, compute_expected.py, tests.
 

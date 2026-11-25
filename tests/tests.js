@@ -6,6 +6,7 @@ import { validate } from '../src/schema.js';
 import { loadSchemas, validateAll, crossCheck, applyEdits } from '../src/data.js';
 import { valueHoldings, totals } from '../src/valuation.js';
 import * as fmt from '../src/format.js';
+import { evaluateRules, evaluateHolding, evaluateConstraints, reviewItems } from '../src/rules.js';
 
 const results = [];
 const test = async (name, fn) => {
@@ -132,6 +133,100 @@ await test('Format français : 1 234,56 € et saisie « 1 234,5 »', () => {
   eq(spaces(fmt.pct(0.1234)), '+12,3 %', 'pourcentage');
   eq(fmt.parseNumber('1 234,5'), 1234.5, 'saisie');
   assert(Number.isNaN(fmt.parseNumber('abc')), 'saisie invalide');
+});
+
+// ---------------------------------------------------------------- stage c: rules + constraints
+// Expected values below are worked out by hand from data/*.json and the rule definitions.
+evaluateRules(rows, files.config, NOW);
+const st = (id) => rows.find((r) => r.id === id).rules.status;
+
+await test('Règles : statuts attendus sur les données d’exemple', () => {
+  eq(st('pea-exemple-industries'), 'ok', 'PER 18, P/CF 11, DN/EBITDA 1,2');
+  eq(st('pea-demo-energie'), 'breach', 'PER 31 > 25 et DN/EBITDA 3,1 > 2,5');
+  eq(st('cto-fjord-exempel'), 'incomplete', 'aucune métrique');
+  eq(st('cto-sample-corp'), 'breach', 'P/CF 16,5 > 15');
+  eq(st('pea-etf-monde'), 'na', 'ETF hors périmètre');
+  eq(st('livret-a'), 'na', 'livret hors périmètre');
+  const demo = rows.find((r) => r.id === 'pea-demo-energie').rules.results;
+  eq(demo.filter((x) => x.state === 'fail').map((x) => x.rule.id).join(','), 'per-max,leverage-max', 'règles enfreintes');
+});
+
+await test('Règles : PER négatif = hors règles, dette nette négative = conforme', () => {
+  const h = structuredClone(files.portfolio.holdings[0]);
+  h.metrics = { per: -8, pcf: 5, net_debt_ebitda: -0.7, as_of: '2026-10-31' };
+  const ev = evaluateHolding(h, files.config, NOW);
+  eq(ev.status, 'breach', 'statut');
+  eq(ev.results.find((x) => x.rule.metric === 'per').reason, 'valeur négative ou nulle', 'raison');
+  eq(ev.results.find((x) => x.rule.metric === 'net_debt_ebitda').state, 'pass', 'trésorerie nette');
+});
+
+await test('Règles : métriques trop anciennes signalées', () => {
+  const h = structuredClone(files.portfolio.holdings[0]);
+  h.metrics.as_of = '2025-01-01';
+  const ev = evaluateHolding(h, files.config, NOW);
+  eq(ev.status, 'stale', 'statut'); assert(ev.metrics_age_days > 600, 'âge');
+});
+
+await test('Règles : une règle ajoutée dans le JSON seul s’applique (métrique libre)', () => {
+  const cfg = structuredClone(files.config);
+  cfg.rules.items.push({ id: 'yield-min', label: 'Rendement ≥ 2 %', metric: 'dividend_yield', op: '>=', value: 2, applies_to: { asset_class: ['equity'] } });
+  const h = structuredClone(files.portfolio.holdings[0]);
+  eq(evaluateHolding(h, cfg, NOW).status, 'incomplete', 'métrique absente');
+  h.metrics.dividend_yield = 1.4;
+  eq(evaluateHolding(h, cfg, NOW).status, 'breach', 'rendement 1,4 < 2');
+  assert(validate(schemas.config, cfg).length === 0, 'config étendue valide');
+  const p = structuredClone(files.portfolio); p.holdings[0] = h;
+  assert(validate(schemas.portfolio, p).length === 0, 'métrique libre valide');
+});
+
+const cons = Object.fromEntries(evaluateConstraints(rows, files.portfolio, files.config).map((c) => [c.id, c]));
+
+await test('Contrainte plafond PEA : 23 400 / 150 000 versés', () => {
+  eq(cons['pea-ceiling'].state, 'ok', 'état');
+  eq(cons['pea-ceiling'].remaining, 126600, 'reste');
+  eq(Math.round(cons['pea-ceiling'].ratio * 1000), 156, 'ratio 15,6 %');
+});
+
+await test('Contrainte poche métaux : 10 067,20 / 48 392,14 = 20,8 % > 20 %', () => {
+  eq(cons['metals-pocket'].state, 'breach', 'état');
+  eq(Math.round(cons['metals-pocket'].share * 1000), 208, 'part');
+});
+
+await test('Contrainte réserve : 27 495,65 € / 2 500 € = 11,0 mois ≥ 6', () => {
+  eq(Math.round(cons['cash-runway'].value * 100), 2749565, 'liquidités');
+  eq(Math.round(cons['cash-runway'].months * 10), 110, 'mois');
+  eq(cons['cash-runway'].state, 'ok', 'état');
+});
+
+await test('À revoir : critiques d’abord, triés par montant', () => {
+  const items = reviewItems(rows, Object.values(cons), files.config, fmt);
+  for (let i = 1; i < items.length; i++) {
+    const a = items[i - 1], b = items[i];
+    assert(a.severity > b.severity || (a.severity === b.severity && (a.amount ?? 0) >= (b.amount ?? 0)), `ordre ${i}`);
+  }
+  const titles = items.filter((i) => i.severity === 3).map((i) => i.title);
+  assert(titles.includes('Poche métaux précieux'), 'contrainte métaux');
+  assert(titles.includes('Démo Énergie (fictif)') && titles.includes('Sample Corp (fictive)'), 'lignes hors règles');
+  assert(items.some((i) => i.severity === 2 && i.title === 'Fjord Exempel AB (fictif)'), 'métriques à saisir');
+});
+
+await test('Édition de métrique (chemin metrics.per) + suppression', () => {
+  let next = applyEdits(files.portfolio, { 'pea-demo-energie': { 'metrics.per': 22.5 } }, 'user', NOW);
+  eq(next.holdings[1].metrics.per, 22.5, 'valeur');
+  eq(next.changelog.at(-1).field, 'metrics.per', 'journal'); eq(next.changelog.at(-1).old, 31, 'ancienne');
+  next = applyEdits(next, { 'pea-demo-energie': { 'metrics.pcf': null } }, 'user', NOW);
+  assert(!('pcf' in next.holdings[1].metrics), 'supprimée');
+  assert(validate(schemas.portfolio, next).length === 0, 'valide');
+  const bad = applyEdits(files.portfolio, { 'cto-fjord-exempel': { 'metrics.per': 12 } }, 'user', NOW);
+  assert(JSON.stringify(validate(schemas.portfolio, bad)).includes('as_of'), 'date des métriques exigée');
+});
+
+await test('Contrôle croisé : contrainte et règle avec ids inconnus', () => {
+  const cfg = structuredClone(files.config);
+  cfg.constraints[0].envelope = 'pea_typo';
+  cfg.rules.items[0].applies_to = { asset_class: ['equities'] };
+  const text = JSON.stringify(crossCheck(files.portfolio, cfg));
+  assert(text.includes('pea_typo') && text.includes('equities'), text);
 });
 
 const failed = results.filter((r) => !r.ok);

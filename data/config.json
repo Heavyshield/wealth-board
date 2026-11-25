@@ -2,6 +2,7 @@
   "schema_version": 1,
   "revision": 1,
   "updated_at": "2026-11-24T00:00:00Z",
+  "sample_data": true,
   "base_currency": "EUR",
   "locale": "fr-FR",
   "envelopes": [
@@ -151,5 +152,85 @@
         "#e66767"
       ]
     }
-  }
+  },
+  "rules": {
+    "metrics_max_age_days": 200,
+    "items": [
+      {
+        "id": "per-max",
+        "label": "PER ≤ 25",
+        "metric": "per",
+        "op": "<=",
+        "value": 25,
+        "require_positive": true,
+        "applies_to": {
+          "asset_class": [
+            "equity"
+          ]
+        },
+        "why": "Valorisation : prix payé pour 1 € de bénéfice"
+      },
+      {
+        "id": "pcf-max",
+        "label": "Cours / flux de trésorerie d'exploitation ≤ 15",
+        "metric": "pcf",
+        "op": "<=",
+        "value": 15,
+        "require_positive": true,
+        "applies_to": {
+          "asset_class": [
+            "equity"
+          ]
+        },
+        "why": "Valorisation sur le cash réellement généré"
+      },
+      {
+        "id": "leverage-max",
+        "label": "Dette nette / EBITDA ≤ 2,5",
+        "metric": "net_debt_ebitda",
+        "op": "<=",
+        "value": 2.5,
+        "applies_to": {
+          "asset_class": [
+            "equity"
+          ]
+        },
+        "why": "Endettement : une valeur négative = trésorerie nette (conforme)"
+      }
+    ]
+  },
+  "constraints": [
+    {
+      "id": "pea-ceiling",
+      "type": "contribution_ceiling",
+      "label": "Plafond de versements PEA",
+      "envelope": "pea",
+      "ceiling": 150000,
+      "warn_ratio": 0.9
+    },
+    {
+      "id": "metals-pocket",
+      "type": "share_cap",
+      "label": "Poche métaux précieux",
+      "group_by": "asset_class",
+      "keys": [
+        "metal"
+      ],
+      "max": 0.2,
+      "min": 0.05
+    },
+    {
+      "id": "cash-runway",
+      "type": "runway",
+      "label": "Réserve de sécurité",
+      "monthly_budget": 2500,
+      "target_months": 6,
+      "liquid": {
+        "asset_class": [
+          "cash",
+          "account"
+        ]
+      }
+    }
+  ]
 }
