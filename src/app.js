@@ -13,6 +13,7 @@ import { createEditors } from './editors.js';
 import { initDataUI } from './data-ui.js';
 import { makeSnapshot, addSnapshot, buildClaudeExport } from './claude-export.js';
 import { renderJournal } from './journal.js';
+import { createJsonEditor } from './json-editor.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -178,6 +179,17 @@ async function exportForClaude() {
   }
 }
 
+/** Validate + save several files at once (Éditeur Données). Returns true on success. */
+function commitFiles(next, message) {
+  const errs = data.validateAll(next, app.schemas);
+  const bad = Object.keys(errs);
+  if (bad.length) { toast(`Refusé : ${bad[0]} · ${errs[bad[0]][0].path} : ${errs[bad[0]][0].message}`, 'error'); return false; }
+  for (const f of data.FILES) if (next[f] !== app.files[f]) saveLocal(f, next[f]);
+  render();
+  toast(`${message}. Pensez à enregistrer sur Drive.`);
+  return true;
+}
+
 /** Validate + save a new portfolio from any editor. Returns true on success. */
 function commitPortfolio(next, message, { refreshPrices: refresh = false } = {}) {
   const errs = data.validateAll({ ...app.files, portfolio: next }, app.schemas);
@@ -312,7 +324,8 @@ async function main() {
     initSettings();
     $('#snapshot').addEventListener('click', takeSnapshot);
     $('#claude-export').addEventListener('click', exportForClaude);
-    app.dataUI = initDataUI({ app, render, toast, dialog: $('#data'), badge: $('#sync-badge'), openButton: $('#open-data') });
+    app.jsonEditor = createJsonEditor({ dialog: $('#json-editor'), getFiles: () => app.files, schemas: app.schemas, commitFiles });
+    app.dataUI = initDataUI({ app, render, toast, dialog: $('#data'), badge: $('#sync-badge'), openButton: $('#open-data'), openEditor: (mode) => app.jsonEditor.open(mode) });
     app.editors = createEditors({ dialog: $('#editor'), getState: () => ({ portfolio: app.files.portfolio, config: app.files.config }), commit: commitPortfolio });
     $('#remove-sample').addEventListener('click', removeSample);
     initImport({

@@ -65,7 +65,8 @@
         "net_debt_ebitda": 1.2,
         "as_of": "2026-10-31"
       },
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     },
     {
       "id": "pea-demo-energie",
@@ -94,7 +95,8 @@
         "net_debt_ebitda": 3.1,
         "as_of": "2026-06-30"
       },
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     },
     {
       "id": "pea-etf-monde",
@@ -115,7 +117,8 @@
         "cœur"
       ],
       "notes": "Exemple de prix saisi à la main.",
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     },
     {
       "id": "cto-fjord-exempel",
@@ -140,7 +143,8 @@
         "nordique"
       ],
       "notes": "Exemple en SEK, métriques non saisies.",
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     },
     {
       "id": "cto-sample-corp",
@@ -168,7 +172,8 @@
         "net_debt_ebitda": 0.8,
         "as_of": "2026-09-30"
       },
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     },
     {
       "id": "livret-a",
@@ -183,7 +188,8 @@
         "réserve"
       ],
       "notes": "",
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     },
     {
       "id": "livret-ldds",
@@ -198,7 +204,8 @@
         "réserve"
       ],
       "notes": "",
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     },
     {
       "id": "swiss-savings",
@@ -211,7 +218,8 @@
       "price_source": "par",
       "tags": [],
       "notes": "",
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     },
     {
       "id": "home-cash-eur",
@@ -224,7 +232,8 @@
       "price_source": "par",
       "tags": [],
       "notes": "",
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     },
     {
       "id": "metal-napoleon-20f",
@@ -246,7 +255,8 @@
         "coffre"
       ],
       "notes": "Pièces physiques au coffre.",
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     },
     {
       "id": "metal-bar-100g",
@@ -268,7 +278,8 @@
         "gold-avenue"
       ],
       "notes": "",
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     },
     {
       "id": "metal-silver-maple",
@@ -290,7 +301,8 @@
         "coffre"
       ],
       "notes": "",
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T00:00:00Z",
+      "as_of": "2026-11-24"
     }
   ],
   "changelog": []

@@ -77,13 +77,18 @@ export function evaluateConstraints(rows, portfolio, config) {
     if (c.type === 'share_cap') {
       const groups = groupBy(rows, GROUP_KEY[c.group_by]);
       const share = groups.filter((g) => c.keys.includes(g.key)).reduce((a, g) => a + g.share, 0);
-      const value = share * total;
-      const state = c.max !== undefined && share > c.max ? 'breach' : c.min !== undefined && share < c.min ? 'warn' : 'ok';
-      return { ...out, ratio: c.max ? share / c.max : share, share, value, min: c.min, max: c.max, state,
-        headroom: c.max !== undefined ? c.max * total - value : null };
+      const value = groups.filter((g) => c.keys.includes(g.key)).reduce((a, g) => a + g.value, 0);
+      // Caps can be shares (max/min, 0..1) and/or amounts in base currency (max_amount/min_amount/target_amount).
+      const over = (c.max !== undefined && share > c.max) || (c.max_amount !== undefined && value > c.max_amount);
+      const under = (c.min !== undefined && share < c.min) || (c.min_amount !== undefined && value < c.min_amount);
+      const toFill = rows.some((r) => r.to_fill && c.keys.includes(GROUP_KEY[c.group_by](r)));
+      const headroom = c.max_amount !== undefined ? c.max_amount - value : c.max !== undefined ? c.max * totals(rows).value - value : null;
+      return { ...out, ratio: c.max_amount ? value / c.max_amount : c.max ? share / c.max : share, share, value,
+        min: c.min, max: c.max, max_amount: c.max_amount, min_amount: c.min_amount, target_amount: c.target_amount,
+        state: over ? 'breach' : under ? 'warn' : 'ok', headroom, incomplete: toFill };
     }
     if (c.type === 'runway') {
-      const liquid = rows.filter((r) => inScope(r.h, c.liquid)).reduce((a, r) => a + (r.value_base ?? 0), 0);
+      const liquid = rows.filter((r) => r.in_total !== false && inScope(r.h, c.liquid)).reduce((a, r) => a + (r.value_base ?? 0), 0);
       const months = liquid / c.monthly_budget;
       const ratio = months / c.target_months;
       return { ...out, ratio, value: liquid, months, target_months: c.target_months, monthly_budget: c.monthly_budget,
@@ -115,6 +120,7 @@ export function reviewItems(rows, constraints, config, fmt) {
     } else if (ev?.status === 'stale') {
       items.push({ severity: 2, kind: 'métriques', title: r.h.name, detail: `Métriques datées de ${ev.metrics_age_days} jours (max ${config.rules.metrics_max_age_days})`, amount: r.value_base, target: r.id });
     }
+    if (r.to_fill) { items.push({ severity: 1, kind: 'à compléter', title: r.h.name, detail: 'Montant inconnu : non compté (à renseigner, sans deviner)', amount: 0, target: r.id }); continue; }
     if (r.price.status === 'missing') items.push({ severity: 3, kind: 'prix', title: r.h.name, detail: 'Aucun prix : valorisé au prix de revient', amount: r.value_base, target: r.id });
     else if (r.price.status === 'stale') items.push({ severity: 2, kind: 'prix', title: r.h.name, detail: `Dernier prix ${fmt.age(r.price.as_of)}`, amount: r.value_base, target: r.id });
     if (r.fx_missing) items.push({ severity: 3, kind: 'change', title: r.h.name, detail: `Taux ${r.h.currency} manquant : ligne exclue du total`, amount: 0, target: r.id });
@@ -123,9 +129,11 @@ export function reviewItems(rows, constraints, config, fmt) {
     if (c.state === 'ok') continue;
     const sev = c.state === 'breach' ? 3 : 2;
     let detail = c.note ?? '';
-    if (c.type === 'share_cap') detail = c.state === 'breach'
-      ? `${fmt.pct(c.share, { signed: false })} > plafond ${fmt.pct(c.max, { signed: false })}`
-      : `${fmt.pct(c.share, { signed: false })} < minimum ${fmt.pct(c.min, { signed: false })}`;
+    if (c.type === 'share_cap') detail = c.max_amount !== undefined || c.min_amount !== undefined
+      ? `${fmt.money(c.value, base, { digits: 0 })} ${c.state === 'breach' ? `> plafond ${fmt.money(c.max_amount, base, { digits: 0 })}` : `< minimum ${fmt.money(c.min_amount, base, { digits: 0 })}`}`
+      : c.state === 'breach'
+        ? `${fmt.pct(c.share, { signed: false })} > plafond ${fmt.pct(c.max, { signed: false })}`
+        : `${fmt.pct(c.share, { signed: false })} < minimum ${fmt.pct(c.min, { signed: false })}`;
     if (c.type === 'runway') detail = `${fmt.number(c.months, 1)} mois couverts sur ${c.target_months} visés`;
     items.push({ severity: sev, kind: 'contrainte', title: c.label, detail, amount: Math.abs(c.value ?? 0), target: `constraint:${c.id}` });
   }

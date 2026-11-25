@@ -86,7 +86,9 @@ export function createEditors({ dialog, getState, commit }) {
         <label class="field"><span>Enveloppe *</span><select name="envelope">${opts(config.envelopes.map((e) => [e.id, e.label]), v.envelope)}</select></label>
         <label class="field"><span>Classe *</span><select name="asset_class">${opts(config.asset_classes.map((c) => [c.id, c.label]), v.asset_class)}</select></label>
         <label class="field"><span>Devise *</span><input name="currency" maxlength="3" value="${esc(v.currency)}" autocapitalize="characters"></label>
-        <label class="field"><span data-qlabel>Quantité *</span><input name="quantity" inputmode="decimal" value="${n(v.quantity)}"></label>
+        <label class="field"><span data-qlabel>Quantité *</span><input name="quantity" inputmode="decimal" value="${n(v.quantity)}"${h && h.quantity === null ? ' disabled' : ''}></label>
+        <label class="field"><span>Montant connu au (date) *</span><input name="as_of" type="date" value="${esc(v.as_of ?? today())}"></label>
+        <label class="field check"><input type="checkbox" name="to_fill"${h && h.quantity === null ? ' checked' : ''}> Montant inconnu (à compléter)</label>
         <label class="field" data-for="cost"><span>Prix de revient unitaire</span><input name="unit_cost" inputmode="decimal" value="${n(v.unit_cost)}"></label>
         <label class="field" data-for="quote"><span>Ticker (format Yahoo)</span><input name="ticker" value="${esc(v.ticker)}" placeholder="TTE.PA"></label>
         <label class="field" data-for="quote"><span>ISIN</span><input name="isin" value="${esc(v.isin)}" autocapitalize="characters"></label>
@@ -118,6 +120,7 @@ export function createEditors({ dialog, getState, commit }) {
       form.querySelector('[data-qlabel]').textContent = p === 'par' ? 'Solde *' : p === 'spot' ? 'Nombre de pièces / lingots *' : 'Quantité *';
     };
     form.addEventListener('change', sync); form.currency.addEventListener('input', sync); sync();
+    form.to_fill.addEventListener('change', () => { form.quantity.disabled = form.to_fill.checked; });
     dialog.querySelector('[data-delete]')?.addEventListener('click', () => {
       if (!confirm(`Supprimer « ${h.name} » ? La ligne complète reste dans le journal des changements.`)) return;
       if (commit(data.removeHolding(getState().portfolio, h.id, 'user'), `Ligne supprimée : ${h.name}.`)) close();
@@ -128,18 +131,20 @@ export function createEditors({ dialog, getState, commit }) {
       const fail = (msg) => { err.textContent = msg; err.hidden = false; };
       const f = form.elements;
       const p = pricingOf(config, f.asset_class.value);
-      const qty = num(f.quantity.value);
+      const toFill = f.to_fill.checked;
+      const qty = toFill ? null : num(f.quantity.value);
       if (!f.name.value.trim()) return fail('Le nom est obligatoire.');
       if (!/^[A-Z]{3}$/.test(f.currency.value.trim().toUpperCase())) return fail('Devise : 3 lettres (EUR, CHF, USD…).');
-      if (!Number.isFinite(qty) || qty < 0) return fail('Quantité / solde : nombre positif attendu.');
+      if (!toFill && (!Number.isFinite(qty) || qty < 0)) return fail('Quantité / solde : nombre positif attendu (ou cocher « Montant inconnu »).');
+      if (!f.as_of.value) return fail('Date « Montant connu au » obligatoire.');
       const line = {
         name: f.name.value.trim(), envelope: f.envelope.value, asset_class: f.asset_class.value,
-        currency: f.currency.value.trim().toUpperCase(), quantity: qty,
-        unit_cost: p === 'par' ? 1 : num(f.unit_cost.value) ?? 0,
+        currency: f.currency.value.trim().toUpperCase(), quantity: qty, as_of: f.as_of.value,
+        unit_cost: p === 'par' ? 1 : num(f.unit_cost.value) ?? null, // empty = unknown, never 0
         price_source: p === 'par' ? 'par' : p === 'spot' ? 'spot' : (h?.price_source?.startsWith('quote') ? h.price_source : 'quote'),
         tags: f.tags.value.split(',').map((t) => t.trim()).filter(Boolean), notes: f.notes.value.trim(),
       };
-      if (!Number.isFinite(line.unit_cost) || line.unit_cost < 0) return fail('Prix de revient : nombre positif attendu.');
+      if (line.unit_cost !== null && (!Number.isFinite(line.unit_cost) || line.unit_cost < 0)) return fail('Prix de revient : nombre positif attendu.');
       const opt = {};
       if (p === 'quote') { opt.ticker = f.ticker.value.trim() || undefined; opt.isin = f.isin.value.trim().toUpperCase() || undefined; }
       const fxr = num(f.cost_fx_rate.value);

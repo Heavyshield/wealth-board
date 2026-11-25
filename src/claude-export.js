@@ -10,7 +10,7 @@ const eur = (x, cur) => (x === null || x === undefined ? '—' : `${Math.round(x
 const KEYS = {
   envelope: (r) => r.h.envelope, asset_class: (r) => r.h.asset_class, currency: (r) => r.h.currency, region: (r) => r.region,
 };
-const breakdown = (rows, key) => Object.fromEntries(groupBy(rows, KEYS[key]).map((g) => [g.key, round2(g.value)]));
+const breakdown = (rows, key) => Object.fromEntries(groupBy(rows, KEYS[key], 'total').map((g) => [g.key, round2(g.value)]));
 
 /** Today's snapshot from valued rows. date = local calendar day. */
 export function makeSnapshot(rows, config, now = new Date()) {
@@ -53,6 +53,8 @@ export function buildClaudeExport({ rows, files, constraints = [], review = [], 
   L();
   L('## Synthèse');
   L(`- Patrimoine : **${eur(t.value, base)}** · investi ${eur(t.cost, base)} · +/- latente ${eur(t.pnl, base)} (${pct1(t.cost ? t.pnl / t.cost : null)})`);
+  if (t.outside) L(`- Hors patrimoine (suivi seulement) : ${eur(t.outside, base)}`);
+  if (t.to_fill) L(`- Lignes au montant inconnu (à compléter, non comptées) : ${t.to_fill}`);
   L(`- Variation du jour : ${t.day === null ? 'indisponible' : `${eur(t.day, base)} (sur ${pct1(t.day_coverage)} de la valeur)`}`);
   L(`- Fraîcheur des prix (part de la valeur) : ${Object.entries(t.by_status_share).map(([k, v]) => `${k} ${pct1(v)}`).join(', ')}`);
   const last = history.snapshots.at(-1);
@@ -88,7 +90,8 @@ export function buildClaudeExport({ rows, files, constraints = [], review = [], 
     total: round2(t.value), cost: round2(t.cost),
     holdings: rows.map((r) => ({
       id: r.id, name: r.h.name, envelope: r.h.envelope, class: r.h.asset_class, ccy: r.h.currency, ticker: r.h.ticker, isin: r.h.isin,
-      qty: r.h.quantity, unit_cost: r.h.unit_cost, price: round2(r.price.value), price_ccy: r.price.currency,
+      qty: r.h.quantity, unit_cost: r.h.unit_cost, as_of: r.h.as_of, to_fill: r.to_fill || undefined,
+      in_net_worth: r.in_total === false ? false : undefined, in_allocation: r.in_alloc === false && r.in_total !== false ? false : undefined, price: round2(r.price.value), price_ccy: r.price.currency,
       price_status: r.price.status, price_as_of: r.price.as_of, value: round2(r.value_base), pnl: round2(r.pnl_base),
       rules: r.rules?.status === 'na' ? undefined : r.rules?.status, metrics: r.h.metrics,
     })),

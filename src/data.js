@@ -208,6 +208,51 @@ export function removeSampleData(portfolio, sample, author = 'user', now = new D
   return bump(next, portfolio, date);
 }
 
+// ---------------------------------------------------------------- merge pasted lines (Éditeur Données)
+/**
+ * Merge a pasted fragment into the files. Fragment = { holdings?: [...], envelopes?: [...], asset_classes?: [...] }
+ * (or a bare array of holdings). Items are matched by `id`: new ones are added, existing ones updated field by
+ * field. Every change is logged (author). Returns { files: NEW {portfolio, config, history}, added, updated, unchanged, problems }.
+ * Lines must carry `as_of` (date the amount is known); missing -> problem, line skipped.
+ */
+export function mergeFragment(files, fragment, author = 'user', now = new Date()) {
+  const date = stamp(now);
+  const frag = Array.isArray(fragment) ? { holdings: fragment } : fragment ?? {};
+  const portfolio = structuredClone(files.portfolio);
+  const config = structuredClone(files.config);
+  const out = { added: [], updated: [], unchanged: [], problems: [] };
+  const log = (file, target, field, old, nw) => portfolio.changelog.push({ date, file, target, field, old: old ?? null, new: nw ?? null, author });
+  let configChanged = false;
+  for (const kind of ['envelopes', 'asset_classes']) {
+    for (const item of frag[kind] ?? []) {
+      if (!item?.id) { out.problems.push(`${kind} : élément sans id`); continue; }
+      const i = config[kind].findIndex((x) => x.id === item.id);
+      if (i < 0) { config[kind].push(item); log('config', `${kind}:${item.id}`, kind, null, 'ajout'); out.added.push(`${kind}:${item.id}`); configChanged = true; }
+      else if (JSON.stringify(config[kind][i]) !== JSON.stringify(item)) { log('config', `${kind}:${item.id}`, kind, config[kind][i], item); config[kind][i] = item; out.updated.push(`${kind}:${item.id}`); configChanged = true; }
+    }
+  }
+  for (const line of frag.holdings ?? []) {
+    if (!line?.id) { out.problems.push(`ligne sans id : ${JSON.stringify(line).slice(0, 80)}`); continue; }
+    if (!line.as_of) { out.problems.push(`${line.id} : « as_of » obligatoire (date à laquelle le montant est connu)`); continue; }
+    const h = portfolio.holdings.find((x) => x.id === line.id);
+    if (!h) {
+      portfolio.holdings.push({ tags: [], notes: '', ...line, updated_at: date });
+      log('portfolio', line.id, 'holding', null, 'ajout');
+      out.added.push(line.id);
+      continue;
+    }
+    let changed = false;
+    for (const [k, v] of Object.entries(line)) {
+      if (k === 'id' || k === 'updated_at') continue;
+      if (JSON.stringify(h[k] ?? null) !== JSON.stringify(v ?? null)) { log('portfolio', line.id, k, h[k], v); if (v === null && k !== 'quantity' && k !== 'unit_cost') delete h[k]; else h[k] = v; changed = true; }
+    }
+    if (changed) { h.updated_at = date; out.updated.push(line.id); } else out.unchanged.push(line.id);
+  }
+  if (out.added.length || out.updated.length) { portfolio.revision += 1; portfolio.updated_at = date; }
+  if (configChanged) { config.revision += 1; config.updated_at = date; }
+  return { files: { ...files, portfolio, config }, ...out };
+}
+
 // ---------------------------------------------------------------- single file "wealth-board.json"
 // The user's data lives in ONE file on Google Drive (source of truth): opened in the board, edited,
 // saved back (share sheet on phone, download on computer). Claude reads/edits the same file.

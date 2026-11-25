@@ -122,9 +122,10 @@ export function applyImport(portfolio, diff, pick, { label, now = new Date(), pr
     if (h.last_price && new Date(h.last_price.as_of) >= new Date(price.as_of)) return; // newest wins
     h.last_price = { value: pos.last_price, currency: pos.currency ?? h.currency, as_of: price.as_of, source: price.source };
   };
+  const asOf = (price?.as_of ?? date).slice(0, 10); // amounts are true as of the export date
   for (const a of diff.added) {
     if (!pick.added.has(a.holding.id)) continue;
-    const h = { ...structuredClone(a.holding), updated_at: date };
+    const h = { ...structuredClone(a.holding), as_of: asOf, updated_at: date };
     withPrice(h, a.pos);
     next.holdings.push(h);
     log(h.id, 'holding', null, 'ajout');
@@ -133,6 +134,7 @@ export function applyImport(portfolio, diff, pick, { label, now = new Date(), pr
     if (!pick.changed.has(c.holding.id)) continue;
     const h = next.holdings.find((x) => x.id === c.holding.id);
     for (const f of c.fields) { log(h.id, f.field, f.old, f.new); h[f.field] = f.new; }
+    h.as_of = asOf;
     withPrice(h, c.pos);
     h.updated_at = date;
   }

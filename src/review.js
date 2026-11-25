@@ -50,7 +50,19 @@ export function renderConstraints(el, results) {
     const s = STATE[c.state];
     const badge = `<span class="state state-${s.cls}"><span aria-hidden="true">${s.icon}</span> ${s.label}</span>`;
     let body = `<p class="kpi-sub">${esc(c.note ?? '')}</p>`;
-    if (c.type === 'share_cap') {
+    if (c.type === 'share_cap' && (c.max_amount !== undefined || c.target_amount !== undefined)) {
+      // Amount cap: scale 0 .. 125 % of the cap, marks at target and cap.
+      const cap = c.max_amount ?? c.target_amount;
+      const scale = Math.max(cap * 1.25, c.value * 1.05);
+      const marks = [];
+      if (c.target_amount !== undefined) marks.push({ at: c.target_amount / scale, label: `cible ${fmt.money(c.target_amount, c.base, { digits: 0 })}` });
+      if (c.max_amount !== undefined) marks.push({ at: c.max_amount / scale, label: `plafond ${fmt.money(c.max_amount, c.base, { digits: 0 })}` });
+      body = `<span class="tile-value">${fmt.money(c.value, c.base, { digits: 0 })}</span>
+        <span class="kpi-sub">${c.target_amount !== undefined ? `cible ${fmt.money(c.target_amount, c.base, { digits: 0 })} · ` : ''}${c.max_amount !== undefined ? `plafond ${fmt.money(c.max_amount, c.base, { digits: 0 })}` : ''} · ${fmt.pct(c.share, { signed: false })} de l’allocation</span>
+        ${meter(c.value / scale, s.cls, marks)}
+        ${c.headroom !== null ? `<span class="kpi-sub">${c.headroom >= 0 ? `Marge avant plafond : ${fmt.money(c.headroom, c.base, { digits: 0 })}` : `Au-dessus du plafond de ${fmt.money(-c.headroom, c.base, { digits: 0 })}`}</span>` : ''}
+        ${c.incomplete ? '<span class="kpi-sub">⚠ des lignes de cette poche sont à compléter : montant partiel</span>' : ''}`;
+    } else if (c.type === 'share_cap') {
       // Scale: 0 .. 125 % of the cap, with marks at min and max.
       const scale = (c.max ?? c.share) * 1.25;
       const marks = [];

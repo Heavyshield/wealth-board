@@ -223,11 +223,18 @@
           "type": "string"
         },
         "quantity": {
-          "type": "number",
-          "minimum": 0
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "null = TO_FILL (unknown): shown as 'à compléter', excluded from totals"
         },
         "unit_cost": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "cost_fx_rate": {
@@ -319,6 +326,15 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date",
+          "description": "Date the quantity/balance is known to be true (mandatory for new lines)"
+        },
+        "details": {
+          "type": "object",
+          "description": "Free facts about the line (subscription date, lock-up end, provider...). Not used in calculations."
         }
       }
     },

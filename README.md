@@ -127,6 +127,19 @@ Réglage unique (15 min) :
    (Accès Drive complet nécessaire : un fichier enregistré depuis le téléphone n'est pas visible avec l'accès minimal.)
    La connexion dure environ une heure, puis il suffit de recliquer.
 
+## Éditeur de données (ajouter des lignes en JSON)
+Données → **Éditeur de données** :
+- **Ajouter des lignes** : collez `{ "holdings": [ … ] }` (par ex. des lignes préparées par Claude). Une ligne avec un
+  `id` existant est mise à jour, sinon ajoutée. On peut ajouter des enveloppes dans le même collage (`"envelopes": [ … ]`).
+- **Fichier complet** : tout le `wealth-board.json`, modifiable directement.
+- **Vérifier** affiche le résumé et les erreurs ; rien n'est appliqué tant qu'il reste une erreur. Chaque changement va dans le journal.
+- Chaque ligne a une date `as_of`. Montant inconnu : `"quantity": null` → affiché « à compléter », jamais compté.
+
+## Vos vraies données
+Elles ne sont **jamais** dans le dépôt GitHub : seulement dans `wealth-board.json` sur votre Drive et dans le dossier
+`private/` de votre ordinateur (ignoré par git). Premier démarrage : Données → Ouvrir → `private/wealth-board.json`,
+puis Importer CSV (PEA Boursorama), Compléter les tickers, et Enregistrer sur Drive.
+
 ## Relevés, export pour Claude, journal
 - **Enregistrer le relevé du jour** (carte « Évolution du patrimoine ») : ajoute la valeur du jour et sa répartition
   à l'historique (un relevé par jour, remplaçable). Puis enregistrez sur Drive.

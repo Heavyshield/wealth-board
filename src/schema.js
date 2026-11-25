@@ -1,5 +1,5 @@
 // Minimal JSON Schema validator (subset of draft 2020-12 used by /schema/*.json).
-// Supported: type, const, enum, required, properties, additionalProperties (bool|schema),
+// Supported: type (string or array), const, enum, required, properties, additionalProperties (bool|schema),
 // items, minimum, maximum, exclusiveMinimum, minLength, pattern, format, $ref (local "#/$defs/...").
 // Errors are returned in French with a readable path, e.g. "holdings[3].quantity".
 
@@ -20,6 +20,7 @@ function typeOf(v) {
 }
 
 function typeMatches(expected, v) {
+  if (Array.isArray(expected)) return expected.some((e) => typeMatches(e, v)); // ["number", "null"]
   const t = typeOf(v);
   if (expected === 'number') return t === 'number' || t === 'integer';
   return t === expected;
@@ -49,7 +50,7 @@ function walk(s, v, path, root, errors) {
 
   if ('const' in s && v !== s.const) return fail(`doit valoir ${JSON.stringify(s.const)}`);
   if (s.enum && !s.enum.includes(v)) return fail(`valeur ${JSON.stringify(v)} non autorisée (attendu : ${s.enum.join(', ')})`);
-  if (s.type && !typeMatches(s.type, v)) return fail(`type attendu ${s.type}, reçu ${typeOf(v)}`);
+  if (s.type && !typeMatches(s.type, v)) return fail(`type attendu ${[].concat(s.type).join(' ou ')}, reçu ${typeOf(v)}`);
 
   if (typeof v === 'number') {
     if (s.minimum !== undefined && v < s.minimum) fail(`doit être ≥ ${s.minimum}`);

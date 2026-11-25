@@ -92,6 +92,7 @@ export function renderKpis(el, rows, config, history) {
       </div>
       <ul class="legend">${segs.map(([k, l]) => `<li><span class="dot seg-${k}"></span>${l} ${fmt.pct(share[k], { signed: false })}</li>`).join('')}</ul>
       ${t.missing_fx ? `<p class="warn">⚠ ${t.missing_fx} ligne(s) exclue(s) : taux de change manquant.</p>` : ''}
+      ${t.to_fill ? `<p class="kpi-sub">${t.to_fill} ligne(s) au montant inconnu, non comptée(s) (à compléter).</p>` : ''}
     </div>`;
 }
 

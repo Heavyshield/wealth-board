@@ -55,6 +55,17 @@
           "currency": {
             "type": "string",
             "pattern": "^[A-Z]{3}$"
+          },
+          "in_net_worth": {
+            "type": "boolean",
+            "description": "false = tracked but not counted in net worth (e.g. locked pension)"
+          },
+          "in_allocation": {
+            "type": "boolean",
+            "description": "false = counted in net worth, left out of allocation views/targets/caps (e.g. cash reserve)"
+          },
+          "notes": {
+            "type": "string"
           }
         }
       }
@@ -114,6 +125,13 @@
         },
         "unknown_label": {
           "type": "string"
+        },
+        "by_isin": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "ISIN -> region label (beats the ISIN country prefix; survives CSV re-imports)"
         }
       }
     },
@@ -340,6 +358,18 @@
           },
           "liquid": {
             "$ref": "#/$defs/scope"
+          },
+          "max_amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "min_amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "target_amount": {
+            "type": "number",
+            "minimum": 0
           }
         }
       }

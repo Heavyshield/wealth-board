@@ -39,6 +39,7 @@ src/data-ui.js      "Données" window (open wealth-board.json / save it: share s
 src/gdrive.js       OPTIONAL desktop Google login: newest wealth-board.json, overwrite in place, trash old copies
 src/claude-export.js  makeSnapshot / addSnapshot / buildClaudeExport (pure)
 src/journal.js      changelog view, filter by author (Claude highlighted)
+src/json-editor.js  Éditeur Données: paste lines/envelopes (merge by id) or edit the whole file; validate before apply
 src/import-ui.js    "Importer CSV" dialog: format, envelope, file -> mapping + diff with checkboxes -> apply
 tests/import.test.js + tests/fixtures/boursorama-fake-*.csv  FAKE exports (EN/FR headers, cp1252, missing column)
 src/format.js       fr-FR formatting + parsing of typed numbers
@@ -144,6 +145,33 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - UI prefs (theme, columns) in localStorage `wb.ui.*`; data working copy in `wb.working.<file>`.
 - Must be served over http(s) (file:// blocks module/JSON loading; the page says so).
 - Local dev: `python -m http.server 8770` in the repo, open http://localhost:8770/ and /tests/.
+
+## Real data: where it lives (never versioned)
+- The user's REAL data never goes in the repo (public). It lives in `wealth-board.json` on Google Drive and in the
+  git-ignored `private/` folder on this computer. `private/wealth-board.json` = seed built 2026-11-25 from the user's
+  description (manual lines: Caisse d'Épargne, Gold Avenue, Swiss account, safe silver 16.84 kg fine, cash, IBKR
+  placeholder, forest, PERCOL, PEE, LPP). PEA lines come from the Boursorama CSV import, not from the seed.
+
+## Pipeline and how Claude integrates lines
+1. Board: Données → Ouvrir wealth-board.json → Importer CSV (Boursorama PEA) → Compléter les tickers → Enregistrer.
+2. The user gives Claude the file (or "Copier pour Claude") + the new facts.
+3. Claude answers with a FRAGMENT, never a rewritten file:
+   `{ "envelopes": [ ...only new/changed... ], "holdings": [ ...only new/changed lines... ] }`
+   - lines matched by `id` (stable kebab-case, never reused); new id = `<envelope>-<name-slug>`;
+   - every line has `as_of` (date the amount is true); unknown amount -> `"quantity": null` (TO_FILL), never guessed;
+   - updating a line: `{ "id": "...", "quantity": 1234, "as_of": "YYYY-MM-DD" }` is enough (fields merged);
+   - metals: `asset_class: "metal"`, `metal {code, weight, unit, purity}` per item, quantity = number of items
+     (or grams with weight 1 g); purity/weight assumptions written in `notes`;
+   - extra facts (term, lock-up, provider) in `details` (free object, not used in calculations).
+4. User pastes the fragment in Données → Éditeur de données → Vérifier → Appliquer (logged as changes) → Enregistrer.
+
+## Model extensions (2026-11-25)
+- Holding: `quantity` / `unit_cost` may be null (TO_FILL / unknown cost: no P&L), `as_of` (date), `details` (object).
+- Envelope: `in_net_worth: false` (tracked, shown separately, e.g. locked pension), `in_allocation: false` (in net worth,
+  out of allocation views / targets / caps, e.g. cash reserve), `notes`.
+- `share_cap` constraints accept euro amounts: `max_amount`, `min_amount`, `target_amount` (meter marks target + cap).
+- `regions.by_isin` (ISIN -> label) beats the ISIN country prefix: needed for ETFs domiciled in FR/IE/LU.
+- No price at all (no quote, no spot, no cost) -> "prix ?", value unknown, never 0.
 
 ## Storage (src/data-ui.js, data.js makeBundle / readOpened)
 - **Keep it simple (user rule, 2026-11-25):** Drive only stores what exists nowhere else (gold, account balances,

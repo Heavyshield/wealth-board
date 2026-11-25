@@ -54,7 +54,10 @@ function columns(ctx) {
     { id: 'price', label: 'Cours', num: true, sort: (r) => r.price.value,
       cell: (r) => `${r.price.status === 'balance' ? '' : fmt.money(r.price.value, r.price.currency)} ${statusBadge(r.price, now)}<span class="sub">${r.price.as_of ? fmt.age(r.price.as_of, now) : 'pas de prix'}</span>` },
     { id: 'value_base', label: `Valeur (${base})`, num: true, sort: (r) => r.value_base ?? -Infinity,
-      cell: (r) => (r.fx_missing ? '<span class="badge badge-missing" title="Taux de change manquant">FX ?</span>' : fmt.money(r.value_base, base)) },
+      cell: (r) => (r.to_fill ? '<span class="badge badge-missing" title="Montant inconnu : à compléter (non compté)">à compléter</span>'
+        : r.no_price ? '<span class="badge badge-missing" title="Pas de cours (actualiser) ni de prix de revient">prix ?</span>'
+        : r.fx_missing ? '<span class="badge badge-missing" title="Taux de change manquant">FX ?</span>' : fmt.money(r.value_base, base))
+        + (r.in_total === false ? '<span class="sub">hors patrimoine</span>' : r.in_alloc === false ? '<span class="sub">hors allocation</span>' : '') },
     { id: 'pnl_base', label: '+/- value', num: true, sort: (r) => r.pnl_base ?? -Infinity,
       cell: (r) => `<span class="${signCls(r.pnl_base)}">${fmt.signedMoney(r.pnl_base, base)}</span>` },
     { id: 'pnl_pct', label: '+/- %', num: true, sort: (r) => r.pnl_pct ?? -Infinity,

@@ -173,6 +173,10 @@ tr.by-claude td { background: color-mix(in srgb, var(--manual) 10%, transparent)
 .who-claude { font-weight: 600; color: var(--manual); }
 .export-text { width: 100%; font: .8rem/1.4 ui-monospace, Consolas, monospace; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
 
+/* JSON editor */
+.json-editor textarea { min-height: 280px; margin-top: 10px; }
+.je-summary { margin: 8px 0; padding-left: 18px; }
+
 /* Chart cards */
 .viz { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .card h2 { margin: 0; font-size: 1rem; }
@@ -269,3 +273,4 @@ table.holdings { width: 100%; border-collapse: collapse; font-variant-numeric: t
   .holdings td:empty { display: none; }
   .holdings .num { white-space: normal; }
 }
+.field.check { flex-direction: row; display: flex; align-items: center; gap: 8px; }

@@ -13,7 +13,7 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString('fr-FR', { day: '2-dig
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /** ctx: { app, render, toast, dialog, badge, openButton }. Returns { afterLocalSave, updateBadge }. */
-export function initDataUI({ app, render, toast, dialog, badge, openButton }) {
+export function initDataUI({ app, render, toast, dialog, badge, openButton, openEditor }) {
   const meta = () => JSON.parse(localStorage.getItem(META) || '{}');
   const setMeta = (m) => localStorage.setItem(META, JSON.stringify({ ...meta(), ...m }));
   const unsaved = () => data.FILES.some((f) => data.readWorking(f)?.dirty);
@@ -136,6 +136,9 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton }) {
       <p class="sub">${share
         ? 'Ouvrir : choisissez Google Drive dans le sélecteur. Enregistrer : dans le menu de partage, « Enregistrer dans Drive », dossier Wealth Board. Supprimez ensuite l’ancienne copie pour n’en garder qu’une.'
         : 'Enregistrer télécharge le fichier : déposez-le dans votre dossier Drive (Google Drive pour ordinateur ou drive.google.com) en remplaçant l’ancien.'}</p>
+      <h3>Éditeur de données</h3>
+      <div class="data-steps"><button type="button" data-edit-json="lines">Ajouter des lignes (JSON)…</button>
+        <button type="button" data-edit-json="full">Modifier le fichier complet…</button></div>
       <details><summary>Autres actions</summary>
         <div class="dialog-actions start">
           ${data.FILES.map((f) => `<button type="button" data-export="${f}">Télécharger ${f}.json seul</button>`).join('')}
@@ -149,6 +152,7 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton }) {
     dialog.querySelector('[data-d="save"]')?.addEventListener('click', saveDrive);
     dialog.querySelector('[data-save]').addEventListener('click', save);
     dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
+    dialog.querySelectorAll('[data-edit-json]').forEach((b) => b.addEventListener('click', () => { dialog.close(); openEditor?.(b.dataset.editJson); }));
     dialog.querySelectorAll('[data-export]').forEach((b) => b.addEventListener('click', () => data.downloadJson(b.dataset.export, app.files[b.dataset.export])));
     dialog.querySelector('[data-reset]').addEventListener('click', () => {
       if (!confirm(unsaved() ? 'Des modifications ne sont pas enregistrées sur Drive. Effacer quand même ?' : 'Effacer la copie de ce navigateur ? Il faudra rouvrir le fichier depuis Drive.')) return;
