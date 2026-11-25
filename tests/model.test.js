@@ -81,6 +81,17 @@ export async function modelTests({ test, assert, eq, files, schemas, validate, N
     eq(again.updated.join(), 'rules:per-danger', 'mise à jour'); eq(again.files.config.rules.items.find((x) => x.id === 'per-danger').value, 30, 'nouveau seuil');
   });
 
+  await test('Éditeur : une contrainte collée remplace celle de même id (montants -> fourchette en %)', () => {
+    const cfg = structuredClone(files.config);
+    cfg.constraints = [{ id: 'metals-pocket', type: 'share_cap', label: 'Poche métaux', group_by: 'asset_class', keys: ['metal'], max_amount: 40000, target_amount: 30000 }];
+    const band = { id: 'metals-pocket', type: 'share_cap', label: 'Poche métaux', group_by: 'asset_class', keys: ['metal'], min: 0.1, max: 0.15 };
+    const r = mergeFragment({ ...files, config: cfg }, { constraints: [band] }, 'user', NOW);
+    eq(r.updated.join(), 'constraints:metals-pocket', 'mise à jour');
+    const c = r.files.config.constraints.find((x) => x.id === 'metals-pocket');
+    assert(c.max === 0.15 && c.min === 0.1 && c.max_amount === undefined, 'remplacée en entier (plus de montants)');
+    assert(validate(schemas.config, r.files.config).length === 0, 'config valide');
+  });
+
   await test('Éditeur : lignes collées ajoutées / mises à jour par id, journalisées', () => {
     const frag = {
       envelopes: [{ id: 'coffre', label: 'Coffre' }],

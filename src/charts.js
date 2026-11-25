@@ -57,6 +57,12 @@ function axis(opts, { money, base, stacked = false } = {}) {
 
 // ---------------------------------------------------------------- KPIs
 
+/** Day change in % of yesterday's value of the lines it covers (balances included at 0). */
+export function dayPct(t) {
+  const covered = t.day_coverage * t.value;
+  return t.day === null || covered - t.day <= 0 ? null : t.day / (covered - t.day);
+}
+
 export function renderKpis(el, rows, config, history) {
   const t = totals(rows);
   const base = config.base_currency;
@@ -75,14 +81,14 @@ export function renderKpis(el, rows, config, history) {
     </div>
     <div class="tile">
       <span class="kpi-label">+/- value latente</span>
-      <span class="tile-value ${sign(t.pnl)}">${fmt.signedMoney(t.pnl, base)}</span>
-      <span class="kpi-sub">${fmt.pct(t.cost ? t.pnl / t.cost : null)} sur ${fmt.money(t.cost, base, { digits: 0 })} investis</span>
+      <span class="tile-value ${sign(t.pnl)}">${fmt.signedMoney(t.pnl, base)} <span class="tile-pct">${fmt.pct(t.cost ? t.pnl / t.cost : null)}</span></span>
+      <span class="kpi-sub">sur ${fmt.money(t.cost, base, { digits: 0 })} investis</span>
     </div>
     <div class="tile">
       <span class="kpi-label">Variation du jour</span>
       ${t.day === null
         ? '<span class="tile-value muted">indisponible</span><span class="kpi-sub">aucun cours du jour avec clôture veille</span>'
-        : `<span class="tile-value ${sign(t.day)}">${fmt.signedMoney(t.day, base)}</span>
+        : `<span class="tile-value ${sign(t.day)}">${fmt.signedMoney(t.day, base)} <span class="tile-pct" title="Par rapport à la valeur de la veille des lignes comptées">${fmt.pct(dayPct(t))}</span></span>
            <span class="kpi-sub" title="Comptent : les soldes (comptes, cash : 0 €) et les lignes avec un cours à jour et une clôture de la veille (actions, ETF, métaux)">calculée sur ${fmt.pct(t.day_coverage, { signed: false })} de la valeur</span>`}
     </div>
     <div class="tile freshness">

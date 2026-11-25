@@ -170,6 +170,7 @@ button.danger { color: var(--missing); border-color: var(--missing); margin-righ
 /* Stage g: journal + export */
 .journal-card { margin-top: 16px; }
 .per-rank-card { align-self: start; }
+.tile-pct { font-size: .6em; font-weight: 600; white-space: nowrap; }
 .ratio-guide th { text-align: left; font-weight: 600; white-space: nowrap; }
 .ratio-guide th .sub { display: block; font-weight: 400; }
 .ratio-name { cursor: help; border-bottom: 1px dotted var(--muted); }

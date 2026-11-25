@@ -212,6 +212,7 @@ to detect that a file changed under a local copy and asks the user instead of ov
   Drive") -> Enregistrer = navigator.share (phone: "Enregistrer dans Drive") or download (computer).
 - Guards: opening over unsaved changes, or a file with a lower portfolio revision, asks for confirmation.
   The repo-sample conflict banner only applies while the working copy is still sample data.
+- Éditeur Données fragment keys: holdings, envelopes, asset_classes, rules, constraints (by id, replaced whole), remove.
 - **Claude editing the data:** read `wealth-board.json` from Drive, edit the part(s), bump that part's `revision` +
   `updated_at`, add changelog entries (`author: "claude"`), validate against /schema, write the file back (or give it
   to the user to put on Drive). The user then re-opens it in the board.

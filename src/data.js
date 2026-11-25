@@ -211,7 +211,7 @@ export function removeSampleData(portfolio, sample, author = 'user', now = new D
 // ---------------------------------------------------------------- merge pasted lines (Éditeur Données)
 /**
  * Merge a pasted fragment into the files. Fragment = { holdings?: [...], envelopes?: [...], asset_classes?: [...],
- *   rules?: [config.rules.items], remove?: [holding ids] }
+ *   rules?: [config.rules.items], constraints?: [config.constraints] (replaced whole, by id), remove?: [holding ids] }
  * (or a bare array of holdings). Items are matched by `id`: new ones are added, existing ones updated field by
  * field. Every change is logged (author). Returns { files: NEW {portfolio, config, history}, added, updated, unchanged, problems }.
  * Lines must carry `as_of` (date the amount is known); missing -> problem, line skipped.
@@ -231,6 +231,13 @@ export function mergeFragment(files, fragment, author = 'user', now = new Date()
       if (i < 0) { config[kind].push(item); log('config', `${kind}:${item.id}`, kind, null, 'ajout'); out.added.push(`${kind}:${item.id}`); configChanged = true; }
       else if (JSON.stringify(config[kind][i]) !== JSON.stringify(item)) { log('config', `${kind}:${item.id}`, kind, config[kind][i], item); config[kind][i] = item; out.updated.push(`${kind}:${item.id}`); configChanged = true; }
     }
+  }
+  for (const item of frag.constraints ?? []) {
+    if (!item?.id) { out.problems.push('contrainte sans id'); continue; }
+    config.constraints ??= [];
+    const i = config.constraints.findIndex((x) => x.id === item.id);
+    if (i < 0) { config.constraints.push(item); log('config', `constraints:${item.id}`, 'constraint', null, 'ajout'); out.added.push(`constraints:${item.id}`); configChanged = true; }
+    else if (JSON.stringify(config.constraints[i]) !== JSON.stringify(item)) { log('config', `constraints:${item.id}`, 'constraint', config.constraints[i], item); config.constraints[i] = item; out.updated.push(`constraints:${item.id}`); configChanged = true; }
   }
   for (const rule of frag.rules ?? []) {
     if (!rule?.id) { out.problems.push('règle sans id'); continue; }
