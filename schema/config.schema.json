@@ -43,7 +43,38 @@
       "additionalProperties": false,
       "properties": {
         "by_country": { "type": "object", "additionalProperties": { "type": "string" } },
+        "by_pricing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "par": { "type": "string" }, "spot": { "type": "string" }, "quote": { "type": "string" } }
+        },
         "unknown_label": { "type": "string" }
+      }
+    },
+    "allocation_targets": {
+      "type": "object",
+      "required": ["group_by", "weights"],
+      "additionalProperties": false,
+      "properties": {
+        "group_by": { "enum": ["asset_class", "envelope", "currency", "region"] },
+        "tolerance": { "type": "number", "minimum": 0, "maximum": 1 },
+        "weights": { "type": "object", "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 } }
+      }
+    },
+    "charts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_slices": { "type": "integer", "minimum": 2, "maximum": 8 },
+        "palette": {
+          "type": "object",
+          "required": ["light", "dark"],
+          "additionalProperties": false,
+          "properties": {
+            "light": { "type": "array", "items": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" } },
+            "dark": { "type": "array", "items": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" } }
+          }
+        }
       }
     },
     "prices": {

@@ -3,5 +3,90 @@
   "revision": 1,
   "updated_at": "2026-11-24T00:00:00Z",
   "sample_data": true,
-  "snapshots": []
+  "snapshots": [
+    {
+      "date": "2025-12-20",
+      "base_currency": "EUR",
+      "total": 41250,
+      "cost": 40100,
+      "note": "exemple fictif"
+    },
+    {
+      "date": "2026-01-20",
+      "base_currency": "EUR",
+      "total": 41980,
+      "cost": 40400,
+      "note": "exemple fictif"
+    },
+    {
+      "date": "2026-02-20",
+      "base_currency": "EUR",
+      "total": 41600,
+      "cost": 40700,
+      "note": "exemple fictif"
+    },
+    {
+      "date": "2026-03-20",
+      "base_currency": "EUR",
+      "total": 42870,
+      "cost": 41000,
+      "note": "exemple fictif"
+    },
+    {
+      "date": "2026-04-20",
+      "base_currency": "EUR",
+      "total": 43420,
+      "cost": 41300,
+      "note": "exemple fictif"
+    },
+    {
+      "date": "2026-05-20",
+      "base_currency": "EUR",
+      "total": 42950,
+      "cost": 41700,
+      "note": "exemple fictif"
+    },
+    {
+      "date": "2026-06-20",
+      "base_currency": "EUR",
+      "total": 44100,
+      "cost": 42200,
+      "note": "exemple fictif"
+    },
+    {
+      "date": "2026-07-20",
+      "base_currency": "EUR",
+      "total": 45030,
+      "cost": 42800,
+      "note": "exemple fictif"
+    },
+    {
+      "date": "2026-08-20",
+      "base_currency": "EUR",
+      "total": 44610,
+      "cost": 43500,
+      "note": "exemple fictif"
+    },
+    {
+      "date": "2026-09-20",
+      "base_currency": "EUR",
+      "total": 46220,
+      "cost": 44400,
+      "note": "exemple fictif"
+    },
+    {
+      "date": "2026-10-20",
+      "base_currency": "EUR",
+      "total": 47050,
+      "cost": 46900,
+      "note": "exemple fictif"
+    },
+    {
+      "date": "2026-11-20",
+      "base_currency": "EUR",
+      "total": 47800,
+      "cost": 47400,
+      "note": "exemple fictif"
+    }
+  ]
 }

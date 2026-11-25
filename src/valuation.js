@@ -55,23 +55,26 @@ export function resolvePrice(h, pricing, market, config, now, quotes = {}) {
     if (!spot || !h.metal) return missing(h);
     const perOz = spot.value / TO_OZ[spot.per];
     const value = fineOz(h.metal) * perOz;
+    const prev_close = spot.prev_close ? fineOz(h.metal) * (spot.prev_close / TO_OZ[spot.per]) : undefined;
     const status = ageHours(spot.as_of, now) > (stale.spot ?? 72) ? 'stale' : 'live';
-    return { value, currency: spot.currency, as_of: spot.as_of, source: spot.source ?? 'spot', status };
+    return { value, prev_close, currency: spot.currency, as_of: spot.as_of, source: spot.source ?? 'spot', status };
   }
   // quote
   const p = quotes[h.id] ?? h.last_price;
   if (!p) return missing(h);
   const status = ageHours(p.as_of, now) > (stale.quote ?? 72) ? 'stale' : 'live';
-  return { value: p.value, currency: p.currency ?? h.currency, as_of: p.as_of, source: p.source ?? 'cache', status };
+  return { value: p.value, prev_close: p.prev_close, currency: p.currency ?? h.currency, as_of: p.as_of, source: p.source ?? 'cache', status };
 }
 
 function missing(h) {
   return { value: h.unit_cost, currency: h.currency, as_of: null, source: 'PRU', status: 'missing' };
 }
 
-/** Region: explicit field > ISIN country prefix mapped in config > unknown label. */
-export function regionOf(h, config) {
+/** Region: explicit field > label by pricing (cash, metals) > ISIN country prefix > unknown label. */
+export function regionOf(h, config, pricing = 'quote') {
   if (h.region) return h.region;
+  const byPricing = config.regions?.by_pricing?.[pricing];
+  if (byPricing) return byPricing;
   const country = h.isin?.slice(0, 2);
   return config.regions?.by_country?.[country] ?? config.regions?.unknown_label ?? '—';
 }
@@ -106,7 +109,9 @@ export function valueHoldings({ portfolio, config, now = new Date(), quotes = {}
       id: h.id,
       pricing,
       price,
-      region: regionOf(h, config),
+      region: regionOf(h, config, pricing),
+      // Day change: only from a fresh market price with a previous close; otherwise null (not 0).
+      day_base: price.status === 'live' && price.prev_close ? fx.convert(h.quantity * (price.value - price.prev_close), price.currency) : null,
       value_local: valueLocal,
       value_base: valueBase,
       value_base_cents: valueBase === null ? null : toCents(valueBase),
@@ -124,16 +129,21 @@ export function valueHoldings({ portfolio, config, now = new Date(), quotes = {}
 
 /** Totals in base currency, from integer cents. */
 export function totals(rows) {
-  let value = 0, cost = 0, missingFx = 0;
+  let value = 0, cost = 0, missingFx = 0, day = 0, dayCovered = 0;
   const byStatus = {};
   for (const r of rows) {
     if (r.value_base_cents === null) { missingFx++; continue; }
     value += r.value_base_cents;
     cost += r.cost_base_cents ?? 0;
     byStatus[r.price.status] = (byStatus[r.price.status] ?? 0) + r.value_base_cents;
+    if (r.day_base !== null) { day += toCents(r.day_base); dayCovered += r.value_base_cents; }
   }
   const share = Object.fromEntries(Object.entries(byStatus).map(([k, c]) => [k, value ? c / value : 0]));
-  return { value: value / 100, cost: cost / 100, pnl: (value - cost) / 100, value_cents: value, by_status_share: share, missing_fx: missingFx };
+  return {
+    value: value / 100, cost: cost / 100, pnl: (value - cost) / 100, value_cents: value,
+    by_status_share: share, missing_fx: missingFx,
+    day: dayCovered ? day / 100 : null, day_coverage: value ? dayCovered / value : 0,
+  };
 }
 
 /** Group values by a key function, from integer cents. Returns [{ key, value, share }] sorted desc. */

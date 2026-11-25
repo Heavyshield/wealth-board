@@ -6,6 +6,10 @@
   <meta name="referrer" content="no-referrer">
   <title>Wealth Board</title>
   <link rel="stylesheet" href="styles.css">
+  <!-- Chart.js pinned + SRI. If it fails to load, the data tables still render. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.6.2/chart.umd.min.js"
+          integrity="sha512-yimJPlA2LwcTVkyKcDs3Xa5/6NNIeyMJeqmKWu6ExzL1I2Xf/BsISw9cVQWiu4jQR2dnbYV6g2O3/jZ1qIUaKQ=="
+          crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
 </head>
 <body>
   <header class="top">
@@ -23,6 +27,46 @@
     <section id="errors" class="errors" role="alert" hidden></section>
     <section id="conflicts" class="conflicts" hidden></section>
     <section id="summary" class="summary" aria-label="Synthèse"></section>
+    <p id="charts-off" class="banner" hidden>Graphiques indisponibles (bibliothèque non chargée, hors ligne ?) : les tableaux restent affichés.</p>
+
+    <section class="viz" aria-label="Graphiques">
+      <article class="card" id="card-alloc">
+        <header class="card-head">
+          <div><h2>Répartition</h2></div>
+          <div class="seg-control" role="radiogroup" aria-label="Regrouper par">
+            <button type="button" role="radio" data-group="envelope">Enveloppe</button>
+            <button type="button" role="radio" data-group="asset_class">Classe</button>
+            <button type="button" role="radio" data-group="currency">Devise</button>
+            <button type="button" role="radio" data-group="region">Région</button>
+          </div>
+        </header>
+        <div class="alloc-body">
+          <div class="donut-box"><canvas aria-label="Répartition du patrimoine (détail dans le tableau)"></canvas></div>
+          <div class="alloc-table"></div>
+        </div>
+      </article>
+
+      <article class="card" id="card-history">
+        <header class="card-head"><div><h2>Évolution du patrimoine</h2><p class="sub-title">Relevés de history.json</p></div>
+          <ul class="legend-inline" hidden><li><span class="key key-total"></span>Patrimoine</li><li><span class="key key-muted"></span>Investi</li></ul></header>
+        <div class="chart-box" style="height:260px"><canvas aria-label="Évolution du patrimoine"></canvas></div>
+        <details><summary>Voir les données</summary><div class="data-table"></div></details>
+      </article>
+
+      <article class="card" id="card-targets">
+        <header class="card-head"><div><h2>Actuel vs cible</h2><p class="sub-title"></p></div>
+          <ul class="legend-inline"><li><span class="key key-actual"></span>Actuel</li><li><span class="key key-muted"></span>Cible</li></ul></header>
+        <div class="chart-box"><canvas aria-label="Allocation actuelle et cible (détail dans le tableau)"></canvas></div>
+        <div class="data-table"></div>
+      </article>
+
+      <article class="card" id="card-pnl">
+        <header class="card-head"><div><h2>+/- value par ligne</h2><p class="sub-title">Hors comptes et cash</p></div>
+          <ul class="legend-inline"><li><span class="key key-gain"></span>Gain</li><li><span class="key key-loss"></span>Perte</li></ul></header>
+        <div class="chart-box"><canvas aria-label="Plus ou moins-value par ligne (détail dans le tableau)"></canvas></div>
+        <details><summary>Voir les données</summary><div class="data-table"></div></details>
+      </article>
+    </section>
     <section aria-labelledby="h-holdings">
       <h2 id="h-holdings">Lignes</h2>
       <div id="holdings"></div>

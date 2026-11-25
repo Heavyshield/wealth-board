@@ -91,6 +91,32 @@ await test('Effet de change isolé (SEK, taux d\'achat 11,0)', () => {
   eq(Math.round((r.pnl_local_base + r.pnl_fx_base) * 100), Math.round(r.pnl_base * 100), 'somme des effets');
 });
 
+await test('Variation du jour = référence Python, et pas de variation sur prix périmé/manuel', () => {
+  const t = totals(rows);
+  const sumCents = rows.reduce((a, r) => a + (r.day_base === null ? 0 : Math.round(r.day_base * 100)), 0);
+  eq(sumCents, expected.total_day_cents, 'variation du jour (centimes)');
+  eq(Math.round(t.day * 100), expected.total_day_cents, 'total jour');
+  for (const r of rows) eq(r.day_base === null, !(r.id in expected.lines && 'day_cents' in expected.lines[r.id]), `couverture ${r.id}`);
+  assert(t.day_coverage > 0 && t.day_coverage < 1, 'couverture partielle attendue');
+});
+
+await test('Régions : cash et métaux par type de prix, actions par ISIN', () => {
+  const g = Object.fromEntries(rows.map((r) => [r.id, r.region]));
+  eq(g['livret-a'], 'Liquidités', 'livret');
+  eq(g['metal-bar-100g'], 'Métaux', 'lingot');
+  eq(g['cto-fjord-exempel'], 'Nordiques', 'SE');
+  eq(g['pea-etf-monde'], 'Monde (ETF)', 'IE');
+});
+
+await test('Cibles d’allocation : somme ≠ 100 % et clé inconnue détectées', () => {
+  const cfg = structuredClone(files.config);
+  cfg.allocation_targets.weights.equity = 0.5;
+  cfg.allocation_targets.weights.cryptos = 0.1;
+  const text = JSON.stringify(crossCheck(files.portfolio, cfg));
+  assert(text.includes('somme des cibles'), 'somme non détectée');
+  assert(text.includes('cryptos'), 'clé inconnue non détectée');
+});
+
 await test('Édition : journal des changements + révision', () => {
   const next = applyEdits(files.portfolio, { 'livret-a': { quantity: 12500, notes: 'test' } }, 'claude', NOW);
   eq(next.revision, files.portfolio.revision + 1, 'révision');

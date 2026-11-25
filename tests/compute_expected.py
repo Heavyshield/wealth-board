@@ -34,10 +34,15 @@ def main():
     rates[base] = Decimal(1)
     spot = pf["market_snapshot"]["spot"]
 
-    lines, total_v, total_c = {}, 0, 0
+    from datetime import datetime, timezone
+    now = datetime(2026, 11, 24, 22, 0, tzinfo=timezone.utc)  # same fixed clock as tests.js
+    stale_h = cfg.get("prices", {}).get("stale_after_hours", {})
+    fresh = lambda iso, kind: (now - datetime.fromisoformat(iso.replace("Z", "+00:00"))).total_seconds() / 3600 <= stale_h.get(kind, 72)
+    lines, total_v, total_c, total_day = {}, 0, 0, 0
     for h in pf["holdings"]:
         qty, cost = D(h["quantity"]), D(h["unit_cost"])
         kind = pricing[h["asset_class"]]
+        prev = None  # previous close per unit, only for fresh market prices
         if "manual_price" in h:
             price, cur = D(h["manual_price"]["value"]), h["manual_price"].get("currency", h["currency"])
         elif kind == "par":
@@ -46,19 +51,27 @@ def main():
             s, m = spot[h["metal"]["code"]], h["metal"]
             per_oz = D(s["value"]) / TO_OZ[s["per"]]
             price, cur = D(m["weight"]) * TO_OZ[m["unit"]] * D(m["purity"]) * per_oz, s["currency"]
+            if "prev_close" in s and fresh(s["as_of"], "spot"):
+                prev = D(m["weight"]) * TO_OZ[m["unit"]] * D(m["purity"]) * D(s["prev_close"]) / TO_OZ[s["per"]]
         else:
             p = h["last_price"]
             price, cur = D(p["value"]), p.get("currency", h["currency"])
+            if "prev_close" in p and fresh(p["as_of"], "quote"):
+                prev = D(p["prev_close"])
         value_base = qty * price / rates[cur]
         cost_rate = D(h["cost_fx_rate"]) if h["currency"] != base and "cost_fx_rate" in h else rates[h["currency"]]
         cost_base = qty * cost / cost_rate
         lines[h["id"]] = {"value_cents": cents(value_base), "cost_cents": cents(cost_base)}
         total_v += cents(value_base)
         total_c += cents(cost_base)
+        if prev is not None:
+            day = qty * (price - prev) / rates[cur]
+            lines[h["id"]]["day_cents"] = cents(day)
+            total_day += cents(day)
 
-    out = {"generated_by": "tests/compute_expected.py", "total_value_cents": total_v, "total_cost_cents": total_c, "lines": lines}
+    out = {"generated_by": "tests/compute_expected.py", "total_value_cents": total_v, "total_cost_cents": total_c, "total_day_cents": total_day, "lines": lines}
     (ROOT / "tests" / "expected.json").write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
-    print(f"total value {total_v / 100:.2f} {base}, cost {total_c / 100:.2f} {base}, {len(lines)} lines")
+    print(f"total value {total_v / 100:.2f} {base}, cost {total_c / 100:.2f} {base}, day {total_day / 100:.2f}, {len(lines)} lines")
 
     try:
         import jsonschema

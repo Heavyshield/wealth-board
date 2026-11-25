@@ -6,7 +6,7 @@ Footer must always read: "Outil de suivi, pas un conseil en investissement."
 
 ## Status (stages)
 - [x] (a) data model, validation, holdings table, filters, inline edit, local working copy, tests
-- [ ] (b) charts + KPIs (Chart.js from cdnjs, pinned)
+- [x] (b) KPIs (hero total, latent P&L, day change with coverage, price freshness) + 4 charts
 - [ ] (c) rules engine + constraint widgets (rules in config.json only)
 - [ ] (d) price providers (adapter per provider, fallback chain, localStorage TTL cache)
 - [ ] (e) Boursorama CSV import with diff preview
@@ -22,6 +22,7 @@ src/data.js         load data/*.json, cross-checks, working copy (localStorage),
 src/schema.js       minimal JSON Schema validator (subset), French error messages
 src/valuation.js    pure valuation: prices, FX, metals, P&L split, totals in integer cents
 src/table.js        holdings table (column defs, sort, filters, picker, inline edit)
+src/charts.js       KPI tiles + charts (allocation donut, history line, actual vs target, P&L bars)
 src/format.js       fr-FR formatting + parsing of typed numbers
 data/*.json         portfolio / config / history (repo copy = FAKE sample data only)
 schema/*.schema.json  one schema per data file
@@ -41,14 +42,16 @@ to detect that a file changed under a local copy and asks the user instead of ov
   `asset_class` (id from config.asset_classes), `ticker?`, `isin?`, `region?`, `quantity`, `unit_cost`
   (in `currency`), `cost_fx_rate?` (FX rate at purchase, base->currency, isolates the currency effect),
   `currency`, `price_source`, `manual_price?` `{value, as_of, currency?, source?}`,
-  `last_price?` (last known market price), `metal?` `{code, weight, unit: g|oz|kg, purity 0..1}`,
+  `last_price?` (last known market price; optional `prev_close` enables the day change), `metal?` `{code, weight, unit: g|oz|kg, purity 0..1}`,
   `tags[]`, `notes`, `metrics?` `{per, pcf, net_debt_ebitda, as_of}`, `updated_at`.
 - `changelog[]`: `{ date, file, target, field, old, new, author: "user"|"claude", note? }`.
 
 ### config.json
 `base_currency`, `locale`, `envelopes[] {id,label,institution,currency}`,
 `asset_classes[] {id,label,pricing: quote|spot|par}`, `regions.by_country` (ISIN prefix -> label),
-`prices.stale_after_hours {quote,spot,fx}`, `table.default_columns`.
+`regions.by_pricing` (label for par / spot lines, e.g. Liquidités / Métaux), `prices.stale_after_hours {quote,spot,fx}`,
+`table.default_columns`, `allocation_targets {group_by, tolerance, weights}` (weights sum to 1, keys must exist),
+`charts {max_slices, palette {light[], dark[]}}`.
 
 ### history.json
 `snapshots[] {date, base_currency, total, cost?, by_envelope?, by_asset_class?, by_currency?, live_share?, note?}`.
@@ -62,7 +65,19 @@ to detect that a file changed under a local copy and asks the user instead of ov
 3. Base value = local value / rate. Totals are summed in integer cents.
 4. Cost in base = qty x unit_cost / `cost_fx_rate` (else today's rate, shown "taux d'achat inconnu").
    FX effect = cost at today's rate - cost at purchase rate; price effect = P&L - FX effect.
-5. Region = `region` field > `config.regions.by_country[ISIN prefix]` > `unknown_label`.
+5. Region = `region` field > `regions.by_pricing[pricing]` > `regions.by_country[ISIN prefix]` > `unknown_label`.
+6. Day change = qty x (price - prev_close) / rate, only for **live** prices with a `prev_close`
+   (quotes, or spot `prev_close`). Shown with its coverage ("calculée sur 33 % de la valeur"); never 0 by default.
+
+## Charts (src/charts.js) -- rules followed
+- Chart.js 4.6.2 from cdnjs, `defer` + SRI sha512 in index.html. If it fails, a banner shows and tables still render.
+- Every chart has a data table (beside it or under "Voir les données"): no value depends on hover or color.
+- Categorical palette = config.charts.palette, validated (dataviz validator, 2026-11-25) against this app's
+  surfaces (#ffffff light, #1b1f26 dark): CVD and normal-vision gates pass; 3 light slots are < 3:1 contrast,
+  so the labelled table next to the donut is required, not optional.
+- Colors follow the entity (config order for envelopes/classes, alphabetical otherwise), never the rank.
+  Donut folds past `max_slices` into "Autres" (muted gray). Gains/losses use the blue/red diverging pair.
+- Bars <= 18px, 4px rounded data end; lines 2px; one y-axis per chart; chart colors re-read on theme toggle.
 
 ## How to...
 - **Add an asset**: append to `holdings` with a new unique `id`; envelope/asset_class must exist in config.
@@ -92,5 +107,7 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - FX: `https://api.frankfurter.dev/v1/latest?base=EUR` (ECB rates, CORS *, no key). Fallback: ECB SDMX
   `https://data-api.ecb.europa.eu/service/data/EXR/D.CHF.EUR.SP00.A?lastNObservations=1&format=jsondata`.
 - Metals: `https://api.gold-api.com/price/XAU` (USD, CORS ok, no key).
-- Equities: Twelve Data / Alpha Vantage (CORS *, free key needed; Euronext/Nordic coverage unverified).
+- Equities: Twelve Data free plan (key tested 2026-11-25) covers **US only**: Euronext Paris needs Grow,
+  Swiss needs Pro, Stockholm/Oslo/Copenhagen symbols refused. Decision for stage d still open.
+  The key is never stored in the repo (localStorage only).
   Yahoo and Swissquote are CORS-blocked from the browser.

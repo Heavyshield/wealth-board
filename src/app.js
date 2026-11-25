@@ -2,13 +2,14 @@
 
 import * as data from './data.js';
 import * as fmt from './format.js';
-import { valueHoldings, totals } from './valuation.js';
-import { HoldingsTable, STATUS_LABEL } from './table.js';
+import { valueHoldings } from './valuation.js';
+import { HoldingsTable } from './table.js';
+import * as viz from './charts.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-const app = { files: null, source: null, schemas: null, table: null };
+const app = { files: null, source: null, schemas: null, table: null, rows: null, grouping: localStorage.getItem('wb.ui.grouping') || 'envelope' };
 
 function toast(message, kind = 'info') {
   const el = document.createElement('div');
@@ -53,37 +54,26 @@ function showConflicts(conflicts) {
   }));
 }
 
-function renderSummary(rows, config, now) {
-  const t = totals(rows);
-  const base = config.base_currency;
-  const share = t.by_status_share;
-  const strip = Object.entries(STATUS_LABEL)
-    .filter(([k]) => share[k])
-    .map(([k, label]) => `<span class="seg seg-${k}" style="flex:${share[k]}" title="${label} : ${fmt.pct(share[k], { signed: false })}"></span>`).join('');
-  const legend = Object.entries(STATUS_LABEL)
-    .filter(([k]) => share[k])
-    .map(([k, label]) => `<li><span class="dot seg-${k}"></span>${label} ${fmt.pct(share[k], { signed: false })}</li>`).join('');
-  $('#summary').innerHTML = `
-    <div class="kpi">
-      <span class="kpi-label">Patrimoine total</span>
-      <span class="kpi-value">${fmt.money(t.value, base)}</span>
-      <span class="kpi-sub ${t.pnl >= 0 ? 'pos' : 'neg'}">${fmt.signedMoney(t.pnl, base)} (${fmt.pct(t.cost ? t.pnl / t.cost : null)}) vs prix de revient</span>
-    </div>
-    <div class="freshness" aria-label="Fraîcheur des prix, en part de la valeur">
-      <span class="kpi-label">Fraîcheur des prix (part de la valeur)</span>
-      <div class="strip">${strip}</div>
-      <ul class="legend">${legend}</ul>
-      ${t.missing_fx ? `<p class="warn">${t.missing_fx} ligne(s) exclue(s) : taux de change manquant.</p>` : ''}
-    </div>`;
+function renderCharts() {
+  const { config, history } = app.files;
+  const rows = app.rows;
+  $('#charts-off').hidden = viz.chartsAvailable();
+  document.querySelectorAll('[data-group]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.group === app.grouping)));
+  viz.renderAllocation($('#card-alloc'), rows, config, app.grouping);
+  viz.renderHistory($('#card-history'), history, config, rows);
+  viz.renderTargets($('#card-targets'), rows, config);
+  viz.renderPnl($('#card-pnl'), rows, config);
 }
 
 function render() {
   const { portfolio, config } = app.files;
   const now = new Date();
   const rows = valueHoldings({ portfolio, config, now });
+  app.rows = rows;
   $('#sample-banner').hidden = !portfolio.sample_data;
   $('#rev').textContent = `portfolio rév. ${portfolio.revision}${data.hasWorking('portfolio') ? ' · copie locale' : ''}`;
-  renderSummary(rows, config, now);
+  viz.renderKpis($('#summary'), rows, config, app.files.history);
+  renderCharts();
   app.table.setData(rows, config, now);
 }
 
@@ -108,7 +98,9 @@ function initTheme() {
     const next = cur === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
     localStorage.setItem('wb.ui.theme', next);
+    if (app.rows) renderCharts(); // chart colors are read from CSS at draw time
   });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => app.rows && renderCharts());
 }
 
 async function main() {
@@ -126,6 +118,12 @@ async function main() {
     if (errs.portfolio || errs.config) return; // cannot value safely
     showConflicts(loaded.conflicts);
     app.table = new HoldingsTable($('#holdings'), { onEditsChange: onEdits });
+    viz.configureChartDefaults();
+    document.querySelectorAll('[data-group]').forEach((b) => b.addEventListener('click', () => {
+      app.grouping = b.dataset.group;
+      localStorage.setItem('wb.ui.grouping', app.grouping);
+      renderCharts();
+    }));
     render();
   } catch (e) {
     showErrors({ chargement: [{ path: 'data', message: e.message }] });

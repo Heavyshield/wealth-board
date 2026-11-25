@@ -5,33 +5,151 @@
   "base_currency": "EUR",
   "locale": "fr-FR",
   "envelopes": [
-    { "id": "pea", "label": "PEA", "institution": "Boursorama", "currency": "EUR" },
-    { "id": "cto", "label": "CTO", "institution": "Interactive Brokers", "currency": "EUR" },
-    { "id": "livret", "label": "Livrets / cash", "institution": "Caisse d'Épargne", "currency": "EUR" },
-    { "id": "metals", "label": "Métaux", "institution": "Gold Avenue + coffre", "currency": "EUR" },
-    { "id": "swiss", "label": "Épargne suisse", "institution": "Banque suisse", "currency": "CHF" },
-    { "id": "home_cash", "label": "Espèces", "institution": "Domicile", "currency": "EUR" }
+    {
+      "id": "pea",
+      "label": "PEA",
+      "institution": "Boursorama",
+      "currency": "EUR"
+    },
+    {
+      "id": "cto",
+      "label": "CTO",
+      "institution": "Interactive Brokers",
+      "currency": "EUR"
+    },
+    {
+      "id": "livret",
+      "label": "Livrets / cash",
+      "institution": "Caisse d'Épargne",
+      "currency": "EUR"
+    },
+    {
+      "id": "metals",
+      "label": "Métaux",
+      "institution": "Gold Avenue + coffre",
+      "currency": "EUR"
+    },
+    {
+      "id": "swiss",
+      "label": "Épargne suisse",
+      "institution": "Banque suisse",
+      "currency": "CHF"
+    },
+    {
+      "id": "home_cash",
+      "label": "Espèces",
+      "institution": "Domicile",
+      "currency": "EUR"
+    }
   ],
   "asset_classes": [
-    { "id": "equity", "label": "Actions", "pricing": "quote" },
-    { "id": "etf", "label": "ETF", "pricing": "quote" },
-    { "id": "metal", "label": "Métaux", "pricing": "spot" },
-    { "id": "cash", "label": "Cash", "pricing": "par" },
-    { "id": "account", "label": "Comptes", "pricing": "par" }
+    {
+      "id": "equity",
+      "label": "Actions",
+      "pricing": "quote"
+    },
+    {
+      "id": "etf",
+      "label": "ETF",
+      "pricing": "quote"
+    },
+    {
+      "id": "metal",
+      "label": "Métaux",
+      "pricing": "spot"
+    },
+    {
+      "id": "cash",
+      "label": "Cash",
+      "pricing": "par"
+    },
+    {
+      "id": "account",
+      "label": "Comptes",
+      "pricing": "par"
+    }
   ],
   "regions": {
     "by_country": {
-      "FR": "Europe", "DE": "Europe", "NL": "Europe", "IT": "Europe", "ES": "Europe", "BE": "Europe",
-      "SE": "Nordiques", "NO": "Nordiques", "DK": "Nordiques", "FI": "Nordiques",
-      "CH": "Suisse", "GB": "Royaume-Uni", "US": "Amérique du Nord", "CA": "Amérique du Nord",
-      "JP": "Asie", "IE": "Monde (ETF)", "LU": "Monde (ETF)"
+      "FR": "Europe",
+      "DE": "Europe",
+      "NL": "Europe",
+      "IT": "Europe",
+      "ES": "Europe",
+      "BE": "Europe",
+      "SE": "Nordiques",
+      "NO": "Nordiques",
+      "DK": "Nordiques",
+      "FI": "Nordiques",
+      "CH": "Suisse",
+      "GB": "Royaume-Uni",
+      "US": "Amérique du Nord",
+      "CA": "Amérique du Nord",
+      "JP": "Asie",
+      "IE": "Monde (ETF)",
+      "LU": "Monde (ETF)"
     },
-    "unknown_label": "Non renseignée"
+    "unknown_label": "Non renseignée",
+    "by_pricing": {
+      "par": "Liquidités",
+      "spot": "Métaux"
+    }
   },
   "prices": {
-    "stale_after_hours": { "quote": 72, "spot": 72, "fx": 96 }
+    "stale_after_hours": {
+      "quote": 72,
+      "spot": 72,
+      "fx": 96
+    }
   },
   "table": {
-    "default_columns": ["name", "envelope", "asset_class", "quantity", "unit_cost", "price", "value_base", "pnl_base", "pnl_pct", "notes"]
+    "default_columns": [
+      "name",
+      "envelope",
+      "asset_class",
+      "quantity",
+      "unit_cost",
+      "price",
+      "value_base",
+      "pnl_base",
+      "pnl_pct",
+      "notes"
+    ]
+  },
+  "allocation_targets": {
+    "group_by": "asset_class",
+    "tolerance": 0.05,
+    "weights": {
+      "equity": 0.25,
+      "etf": 0.25,
+      "metal": 0.15,
+      "cash": 0.02,
+      "account": 0.33
+    }
+  },
+  "charts": {
+    "max_slices": 7,
+    "palette": {
+      "light": [
+        "#2a78d6",
+        "#eb6834",
+        "#1baf7a",
+        "#eda100",
+        "#e87ba4",
+        "#008300",
+        "#6250d6",
+        "#e34948"
+      ],
+      "dark": [
+        "#3987e5",
+        "#d95926",
+        "#199e70",
+        "#c98500",
+        "#d55181",
+        "#0ca30c",
+        "#9085e9",
+        "#e66767"
+      ]
+    }
   }
 }

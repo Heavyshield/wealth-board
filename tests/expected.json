@@ -2,10 +2,12 @@
   "generated_by": "tests/compute_expected.py",
   "total_value_cents": 4839214,
   "total_cost_cents": 4768838,
+  "total_day_cents": 5618,
   "lines": {
     "pea-exemple-industries": {
       "value_cents": 250000,
-      "cost_cents": 200000
+      "cost_cents": 200000,
+      "day_cents": 2800
     },
     "pea-demo-energie": {
       "value_cents": 241000,
@@ -17,11 +19,13 @@
     },
     "cto-fjord-exempel": {
       "value_cents": 205217,
-      "cost_cents": 190909
+      "cost_cents": 190909,
+      "day_cents": -2609
     },
     "cto-sample-corp": {
       "value_cents": 155727,
-      "cost_cents": 136364
+      "cost_cents": 136364,
+      "day_cents": 1273
     },
     "livret-a": {
       "value_cents": 1200000,
@@ -41,15 +45,18 @@
     },
     "metal-napoleon-20f": {
       "value_cents": 179170,
-      "cost_cents": 152000
+      "cost_cents": 152000,
+      "day_cents": 896
     },
     "metal-bar-100g": {
       "value_cents": 771541,
-      "cost_cents": 780000
+      "cost_cents": 780000,
+      "day_cents": 3858
     },
     "metal-silver-maple": {
       "value_cents": 55994,
-      "cost_cents": 60000
+      "cost_cents": 60000,
+      "day_cents": -600
     }
   }
 }

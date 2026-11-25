@@ -39,6 +39,15 @@ export function crossCheck(portfolio, config) {
     if (!cls) errors.push({ path: `${at}.asset_class`, message: `classe « ${h.asset_class} » absente de config.asset_classes` });
     if (cls?.pricing === 'spot' && !h.metal) errors.push({ path: at, message: 'ligne métal sans bloc « metal » (code, poids, unité, pureté)' });
   });
+  const t = config.allocation_targets;
+  if (t) {
+    const sum = Object.values(t.weights).reduce((a, b) => a + b, 0);
+    if (Math.abs(sum - 1) > 0.001) errors.push({ path: 'config.allocation_targets.weights', message: `la somme des cibles fait ${Math.round(sum * 1000) / 10} %, attendu 100 %` });
+    const known = t.group_by === 'asset_class' ? classes : t.group_by === 'envelope' ? envelopes : null;
+    for (const k of Object.keys(t.weights)) {
+      if (known && !known.has(k)) errors.push({ path: `config.allocation_targets.weights.${k}`, message: `« ${k} » inconnu dans config.${t.group_by === 'asset_class' ? 'asset_classes' : 'envelopes'}` });
+    }
+  }
   return errors;
 }
 

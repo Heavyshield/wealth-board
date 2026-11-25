@@ -8,11 +8,31 @@
       "base": "EUR",
       "as_of": "2026-11-24T16:00:00Z",
       "source": "sample",
-      "rates": { "CHF": 0.92, "USD": 1.10, "SEK": 11.5, "NOK": 11.7, "DKK": 7.46 }
+      "rates": {
+        "CHF": 0.92,
+        "USD": 1.1,
+        "SEK": 11.5,
+        "NOK": 11.7,
+        "DKK": 7.46
+      }
     },
     "spot": {
-      "XAU": { "value": 2400, "currency": "EUR", "per": "oz", "as_of": "2026-11-24T16:00:00Z", "source": "sample" },
-      "XAG": { "value": 28, "currency": "EUR", "per": "oz", "as_of": "2026-11-24T16:00:00Z", "source": "sample" }
+      "XAU": {
+        "value": 2400,
+        "currency": "EUR",
+        "per": "oz",
+        "as_of": "2026-11-24T16:00:00Z",
+        "source": "sample",
+        "prev_close": 2388
+      },
+      "XAG": {
+        "value": 28,
+        "currency": "EUR",
+        "per": "oz",
+        "as_of": "2026-11-24T16:00:00Z",
+        "source": "sample",
+        "prev_close": 28.3
+      }
     }
   },
   "holdings": [
@@ -27,10 +47,24 @@
       "unit_cost": 50,
       "currency": "EUR",
       "price_source": "quote",
-      "last_price": { "value": 62.5, "currency": "EUR", "as_of": "2026-11-24T16:35:00Z", "source": "sample" },
-      "tags": ["dividende", "industrie"],
+      "last_price": {
+        "value": 62.5,
+        "currency": "EUR",
+        "as_of": "2026-11-24T16:35:00Z",
+        "source": "sample",
+        "prev_close": 61.8
+      },
+      "tags": [
+        "dividende",
+        "industrie"
+      ],
       "notes": "Ligne d'exemple, conforme aux règles.",
-      "metrics": { "per": 18, "pcf": 11, "net_debt_ebitda": 1.2, "as_of": "2026-10-31" },
+      "metrics": {
+        "per": 18,
+        "pcf": 11,
+        "net_debt_ebitda": 1.2,
+        "as_of": "2026-10-31"
+      },
       "updated_at": "2026-11-24T00:00:00Z"
     },
     {
@@ -44,10 +78,22 @@
       "unit_cost": 30,
       "currency": "EUR",
       "price_source": "quote",
-      "last_price": { "value": 24.1, "currency": "EUR", "as_of": "2026-11-10T16:35:00Z", "source": "sample" },
-      "tags": ["énergie"],
+      "last_price": {
+        "value": 24.1,
+        "currency": "EUR",
+        "as_of": "2026-11-10T16:35:00Z",
+        "source": "sample"
+      },
+      "tags": [
+        "énergie"
+      ],
       "notes": "Exemple de prix périmé et de règles enfreintes.",
-      "metrics": { "per": 31, "pcf": 9, "net_debt_ebitda": 3.1, "as_of": "2026-06-30" },
+      "metrics": {
+        "per": 31,
+        "pcf": 9,
+        "net_debt_ebitda": 3.1,
+        "as_of": "2026-06-30"
+      },
       "updated_at": "2026-11-24T00:00:00Z"
     },
     {
@@ -61,8 +107,13 @@
       "unit_cost": 80,
       "currency": "EUR",
       "price_source": "quote",
-      "manual_price": { "value": 92.4, "as_of": "2026-11-20" },
-      "tags": ["cœur"],
+      "manual_price": {
+        "value": 92.4,
+        "as_of": "2026-11-20"
+      },
+      "tags": [
+        "cœur"
+      ],
       "notes": "Exemple de prix saisi à la main.",
       "updated_at": "2026-11-24T00:00:00Z"
     },
@@ -78,8 +129,16 @@
       "cost_fx_rate": 11.0,
       "currency": "SEK",
       "price_source": "quote",
-      "last_price": { "value": 118, "currency": "SEK", "as_of": "2026-11-24T16:30:00Z", "source": "sample" },
-      "tags": ["nordique"],
+      "last_price": {
+        "value": 118,
+        "currency": "SEK",
+        "as_of": "2026-11-24T16:30:00Z",
+        "source": "sample",
+        "prev_close": 119.5
+      },
+      "tags": [
+        "nordique"
+      ],
       "notes": "Exemple en SEK, métriques non saisies.",
       "updated_at": "2026-11-24T00:00:00Z"
     },
@@ -94,10 +153,21 @@
       "unit_cost": 150,
       "currency": "USD",
       "price_source": "quote",
-      "last_price": { "value": 171.3, "currency": "USD", "as_of": "2026-11-24T21:00:00Z", "source": "sample" },
+      "last_price": {
+        "value": 171.3,
+        "currency": "USD",
+        "as_of": "2026-11-24T21:00:00Z",
+        "source": "sample",
+        "prev_close": 169.9
+      },
       "tags": [],
       "notes": "",
-      "metrics": { "per": 22, "pcf": 16.5, "net_debt_ebitda": 0.8, "as_of": "2026-09-30" },
+      "metrics": {
+        "per": 22,
+        "pcf": 16.5,
+        "net_debt_ebitda": 0.8,
+        "as_of": "2026-09-30"
+      },
       "updated_at": "2026-11-24T00:00:00Z"
     },
     {
@@ -109,7 +179,9 @@
       "unit_cost": 1,
       "currency": "EUR",
       "price_source": "par",
-      "tags": ["réserve"],
+      "tags": [
+        "réserve"
+      ],
       "notes": "",
       "updated_at": "2026-11-24T00:00:00Z"
     },
@@ -122,7 +194,9 @@
       "unit_cost": 1,
       "currency": "EUR",
       "price_source": "par",
-      "tags": ["réserve"],
+      "tags": [
+        "réserve"
+      ],
       "notes": "",
       "updated_at": "2026-11-24T00:00:00Z"
     },
@@ -161,8 +235,16 @@
       "unit_cost": 380,
       "currency": "EUR",
       "price_source": "spot",
-      "metal": { "code": "XAU", "weight": 6.45, "unit": "g", "purity": 0.9 },
-      "tags": ["pièce", "coffre"],
+      "metal": {
+        "code": "XAU",
+        "weight": 6.45,
+        "unit": "g",
+        "purity": 0.9
+      },
+      "tags": [
+        "pièce",
+        "coffre"
+      ],
       "notes": "Pièces physiques au coffre.",
       "updated_at": "2026-11-24T00:00:00Z"
     },
@@ -175,8 +257,16 @@
       "unit_cost": 7800,
       "currency": "EUR",
       "price_source": "spot",
-      "metal": { "code": "XAU", "weight": 100, "unit": "g", "purity": 0.9999 },
-      "tags": ["lingot", "gold-avenue"],
+      "metal": {
+        "code": "XAU",
+        "weight": 100,
+        "unit": "g",
+        "purity": 0.9999
+      },
+      "tags": [
+        "lingot",
+        "gold-avenue"
+      ],
       "notes": "",
       "updated_at": "2026-11-24T00:00:00Z"
     },
@@ -189,8 +279,16 @@
       "unit_cost": 30,
       "currency": "EUR",
       "price_source": "spot",
-      "metal": { "code": "XAG", "weight": 1, "unit": "oz", "purity": 0.9999 },
-      "tags": ["pièce", "coffre"],
+      "metal": {
+        "code": "XAG",
+        "weight": 1,
+        "unit": "oz",
+        "purity": 0.9999
+      },
+      "tags": [
+        "pièce",
+        "coffre"
+      ],
       "notes": "",
       "updated_at": "2026-11-24T00:00:00Z"
     }

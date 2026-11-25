@@ -28,9 +28,25 @@ export function number(value, maxDigits = 4) {
 }
 
 /** 0.1234 -> "+12,3 %" */
-export function pct(ratio, { signed = true } = {}) {
+export function pct(ratio, { signed = true, digits = 1 } = {}) {
   if (ratio === null || ratio === undefined || !isFinite(ratio)) return '—';
-  return nf(`p${signed}`, { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: signed ? 'exceptZero' : 'auto' }).format(ratio);
+  return nf(`p${signed}${digits}`, { style: 'percent', minimumFractionDigits: digits, maximumFractionDigits: digits, signDisplay: signed ? 'exceptZero' : 'auto' }).format(ratio);
+}
+
+/** Signed plain number: "+1,5" */
+export function signedNumber(value, digits = 1) {
+  if (value === null || value === undefined || !isFinite(value)) return '—';
+  return nf(`sn${digits}`, { minimumFractionDigits: digits, maximumFractionDigits: digits, signDisplay: 'exceptZero' }).format(value);
+}
+
+/** Axis ticks: "45 k€", "1,2 M€" */
+export function compactMoney(value, currency) {
+  return nf(`cm${currency}`, { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(value);
+}
+
+/** "2026-03-20" -> "mars 26" */
+export function monthLabel(iso) {
+  return new Date(iso).toLocaleDateString(LOCALE, { month: 'short', year: '2-digit' });
 }
 
 export function date(iso) {
