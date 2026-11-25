@@ -276,7 +276,7 @@ async function main() {
       })));
     if (unknown.length) showErrors({ config: unknown });
     initSettings();
-    app.dataUI = initDataUI({ app, render, toast, dialog: $('#data'), conflictDialog: $('#conflict'), badge: $('#sync-badge'), openButton: $('#open-data') });
+    app.dataUI = initDataUI({ app, render, toast, dialog: $('#data'), badge: $('#sync-badge'), openButton: $('#open-data') });
     app.editors = createEditors({ dialog: $('#editor'), getState: () => ({ portfolio: app.files.portfolio, config: app.files.config }), commit: commitPortfolio });
     $('#remove-sample').addEventListener('click', removeSample);
     initImport({

@@ -12,7 +12,8 @@ Footer must always read: "Outil de suivi, pas un conseil en investissement."
 - [x] (e) CSV position import (Boursorama profile) with column mapping, diff preview, per-line apply
 - [x] (e+) editing: ticker assistant (ISIN -> Yahoo via proxy /search), line editor (add/edit/delete any class),
 "Retirer les données d'exemple"
-- [x] (f) Google Drive sync (GIS token, drive.file) + local folder (File System Access) + JSON import/export, conflicts asked
+- [x] (f) storage = ONE file wealth-board.json on Google Drive, opened / saved by the user (no OAuth). The OAuth
+  sync built first (commit 6aa2c45) was removed 2026-11-25 at the user's request: too convoluted.
 - [ ] (g) "Export for Claude" + snapshot button
 
 ## Layout
@@ -34,10 +35,7 @@ tests/prices.test.js + tests/fixtures/*.json  real API responses captured 2026-1
 src/csv.js          tolerant CSV: UTF-8/BOM or Windows-1252, ; , tab, RFC 4180 quotes, FR/EN numbers
 src/importer.js     column mapping via config.imports, diff vs one envelope, applyImport (changelog per change)
 src/editors.js      dialogs: ticker assistant, line editor -- all via data.js
-src/drive.js        GIS token (drive.file, memory only) + Drive REST client (ensureFolder, listFiles, get/update/create)
-src/sync.js         pure sync rules (pull / push / conflict) + summarizeDiff; tests/sync.test.js runs it on a fake Drive
-src/folder.js       File System Access fallback (handle in IndexedDB)
-src/data-ui.js      "Données" dialog, header sync badge, conflict dialog (keep mine / keep Drive's / see diff)
+src/data-ui.js      "Données" window (open wealth-board.json / save it: share sheet or download) + header badge
 src/import-ui.js    "Importer CSV" dialog: format, envelope, file -> mapping + diff with checkboxes -> apply
 tests/import.test.js + tests/fixtures/boursorama-fake-*.csv  FAKE exports (EN/FR headers, cp1252, missing column)
 src/format.js       fr-FR formatting + parsing of typed numbers
@@ -144,22 +142,21 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - Must be served over http(s) (file:// blocks module/JSON loading; the page says so).
 - Local dev: `python -m http.server 8770` in the repo, open http://localhost:8770/ and /tests/.
 
-## Persistence and sync (src/sync.js, src/data-ui.js)
-- Source of the user's data, `localStorage wb.source`: `repo` (sample defaults) | `drive` | `folder`.
-  The local working copy (`wb.working.<file>` = { data, dirty, drive_version, base_revision }) is the instant /
-  offline cache; Drive is the shared master. Every save goes through app.js `saveLocal()` -> dirty -> pushed.
-- Drive: folder "Wealth Board" (appProperties wealthboard=folder) created by the app; files portfolio.json /
-  config.json / history.json, pretty-printed. Scope drive.file: the app sees ONLY files it created, so
-  **Claude must edit these files in place** (same file id) through a Drive connector -- a new file with the same
-  name is invisible to the app. Change detection uses Drive's `version` (catches edits that forget `revision`),
-  but always bump `revision` + changelog anyway.
-- Rules: clean+unchanged = nothing; clean+changed = pull; dirty+unchanged = push; dirty+changed = ask;
-  invalid JSON/schema on Drive = ask, never overwrite silently. A legacy local record without `dirty` counts as dirty.
-- Pull on tab focus when a token is valid; token ~1 h, then the badge says "reconnecter" (GIS needs a click).
-- OAuth client ID: `config.drive.client_id` (public by design, restricted to authorized JS origins
-  https://heavyshield.github.io and http://localhost:8770). Setup steps in README.
-- Not verified yet (needs the user's client ID): the real Google sign-in and Drive calls. Verified: sync logic on a
-  fake Drive (7 scenarios), GIS script loads, UI flows, JSON import/export.
+## Storage (src/data-ui.js, data.js makeBundle / readOpened)
+- **Keep it simple (user rule, 2026-11-25):** Drive only stores what exists nowhere else (gold, account balances,
+  settings). No OAuth, no sync engine, no background jobs. Propose before adding any storage machinery.
+- The user's data = ONE file `wealth-board.json` on Google Drive (source of truth):
+  `{ "format": "wealth-board/1", "saved_at", "portfolio": {...}, "config": {...}, "history": {...} }`, pretty-printed.
+  Each part follows its schema in /schema. The board also opens the three files separately.
+- Flow: Données → Ouvrir (file picker; phones offer Google Drive) -> working copy in localStorage
+  (`wb.working.<file>` { data, dirty, base_revision }) -> edits mark it dirty (badge "Modifié · à enregistrer sur
+  Drive") -> Enregistrer = navigator.share (phone: "Enregistrer dans Drive") or download (computer).
+- Guards: opening over unsaved changes, or a file with a lower portfolio revision, asks for confirmation.
+  The repo-sample conflict banner only applies while the working copy is still sample data.
+- **Claude editing the data:** read `wealth-board.json` from Drive, edit the part(s), bump that part's `revision` +
+  `updated_at`, add changelog entries (`author: "claude"`), validate against /schema, write the file back (or give it
+  to the user to put on Drive). The user then re-opens it in the board.
+- `repo data/*.json` stay FAKE sample data (commit hook).
 
 ## CSV import (src/importer.js)
 - Real Boursorama export format is not publicly documented (checked 2026-11-25): "Positions" tab -> "Exporter en CSV",

@@ -9,7 +9,7 @@ import * as fmt from '../src/format.js';
 import { pricesTests } from './prices.test.js';
 import { importTests } from './import.test.js';
 import { editingTests } from './editing.test.js';
-import { syncTests } from './sync.test.js';
+import { filesTests } from './files.test.js';
 import { evaluateRules, evaluateHolding, evaluateConstraints, reviewItems } from '../src/rules.js';
 
 const results = [];
@@ -236,8 +236,8 @@ await importTests({ test, assert, eq, files, schemas, validate, NOW });
 // ---------------------------------------------------------------- tickers + editing
 await editingTests({ test, assert, eq, files, schemas, validate, NOW });
 
-// ---------------------------------------------------------------- stage f: Drive sync
-await syncTests({ test, assert, eq, files, schemas, validate, NOW });
+// ---------------------------------------------------------------- single-file storage (Drive)
+await filesTests({ test, assert, eq, files, schemas, validate, NOW });
 
 const failed = results.filter((r) => !r.ok);
 window.testResults = { pass: results.length - failed.length, fail: failed.length, results };

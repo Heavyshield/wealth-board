@@ -90,37 +90,20 @@ Le fichier est lu dans le navigateur, rien n'est envoyé. Si une colonne n'est p
 les en-têtes trouvés : ajoutez le nom exact dans `config.json → imports.boursorama.columns`.
 Les nouvelles lignes n'ont pas de ticker : ajoutez-le (format Yahoo, ex. `TTE.PA`) pour le cours en direct.
 
-## Sauvegarde et synchronisation (bouton « Données »)
-Le badge à côté du titre indique où sont vos données : « Navigateur seulement · non sauvegardé »,
-« Drive ✓ 10:42 », « Drive · 1 non envoyé(s) », « Drive · reconnecter »…
-- **Google Drive** (recommandé, marche aussi sur téléphone) : un dossier « Wealth Board » avec `portfolio.json`,
-  `config.json`, `history.json`. Chaque modification est envoyée automatiquement. Si un fichier a changé sur Drive
-  entre-temps (Claude, autre appareil), l'application **demande** : garder la mienne / garder celle de Drive /
-  voir les différences. Rien n'est écrasé en silence.
-- **Dossier local** (Chrome / Edge sur ordinateur) : par exemple un dossier synchronisé par Google Drive pour ordinateur.
-- **Fichiers JSON** : exporter / importer chaque fichier, toujours disponible.
+## Vos données sur Google Drive (bouton « Données »)
+Toutes vos données (lignes, réglages, historique) tiennent dans **un seul fichier : `wealth-board.json`**,
+rangé dans votre Google Drive (par ex. un dossier « Wealth Board »). Drive est la référence ; aucune connexion
+Google n'est demandée par le site.
+- **Ouvrir** : Données → « 1. Ouvrir depuis Drive… » → sur téléphone, choisir Google Drive dans le sélecteur
+  → `wealth-board.json`.
+- **Modifier** dans le tableau (✎, + Ajouter une ligne, Importer CSV…). Le badge passe à « Modifié · à enregistrer sur Drive ».
+- **Enregistrer** : Données → « 2. Enregistrer sur Drive ».
+  - Téléphone : menu de partage → « Enregistrer dans Drive » → dossier Wealth Board. Drive garde alors deux
+    fichiers du même nom : supprimez l'ancien pour n'en garder qu'un.
+  - Ordinateur : le fichier est téléchargé ; déposez-le dans le dossier Drive (Google Drive pour ordinateur ou
+    drive.google.com → Gérer les versions) en remplaçant l'ancien.
+- Ce navigateur garde une copie pour s'ouvrir vite. Si Claude ou un autre appareil a modifié le fichier sur Drive,
+  rouvrez-le. Ouvrir un fichier plus ancien que celui affiché, ou par-dessus des modifications non enregistrées,
+  demande confirmation.
+- Premier enregistrement : partez des données d'exemple ou de votre import, puis « Enregistrer sur Drive ».
 
-### Configurer Google Drive (15 minutes, une seule fois)
-L'application utilise le droit minimal `drive.file` : elle ne voit **que les fichiers qu'elle crée**, rien d'autre
-de votre Drive. Le « client ID » n'est pas un secret (il est limité aux adresses autorisées) : il va dans `config.json`.
-1. Aller sur https://console.cloud.google.com/ (compte Google qui a le Drive) → en haut **Sélectionner un projet** →
-   **Nouveau projet** → nom `wealth-board` → **Créer**, puis sélectionner ce projet.
-2. Menu ☰ → **API et services** → **Bibliothèque** → chercher **Google Drive API** → **Activer**.
-3. Menu → **API et services** → **Écran de consentement OAuth** (ou « Google Auth Platform ») → **Commencer** :
-   nom de l'application `Wealth Board`, e-mail d'assistance = le vôtre → type d'audience **Externe** →
-   coordonnées = votre e-mail → accepter → **Créer**.
-4. **Audience** (ou « Utilisateurs test ») → **Ajouter des utilisateurs** → votre adresse Gmail → **Enregistrer**.
-   (L'application reste « En test » : seul vous pouvez vous connecter. C'est voulu.)
-5. **Clients** (ou **Identifiants** → **Créer des identifiants** → **ID client OAuth**) → type **Application Web** →
-   nom `wealth-board web` → **Origines JavaScript autorisées**, ajouter :
-   - `https://heavyshield.github.io`
-   - `http://localhost:8770`
-   (pas d'« URI de redirection » nécessaire) → **Créer**.
-6. Copier l'**ID client** (se termine par `.apps.googleusercontent.com`) dans `data/config.json` :
-   `"drive": { "client_id": "…apps.googleusercontent.com", "folder_name": "Wealth Board" }`, puis commit + push.
-7. Sur le site : **Données** → **Connecter Google Drive** → choisir votre compte → autoriser.
-   Au premier branchement, vos données de ce navigateur sont envoyées dans le dossier « Wealth Board ».
-   Sur un autre appareil (téléphone), le même bouton retrouve le dossier et charge vos données.
-Une connexion Google dure environ une heure ; ensuite le badge affiche « reconnecter » (un clic).
-Google peut afficher « Google n'a pas validé cette application » : c'est votre propre application en mode test,
-cliquez **Continuer**.

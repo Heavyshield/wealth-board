@@ -491,19 +491,6 @@
           }
         }
       }
-    },
-    "drive": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "client_id": {
-          "type": "string",
-          "description": "Google OAuth client ID (public, restricted by authorized origins)"
-        },
-        "folder_name": {
-          "type": "string"
-        }
-      }
     }
   },
   "$defs": {

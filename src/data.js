@@ -85,27 +85,21 @@ export function validateAll(files, schemas) {
   return out;
 }
 
-/** Where the user's data lives: 'repo' (sample, default), 'drive' or 'folder'. */
-export const getSource = () => localStorage.getItem('wb.source') ?? 'repo';
-export const setSource = (s) => localStorage.setItem('wb.source', s);
-
 /**
- * Load files from ./data, then overlay the localStorage working copy.
- * Returns { files, source, conflicts: [{ file, mine, theirs }] }.
- * In 'repo' mode a conflict means the repo file changed (higher revision) since the working copy was
- * based on it: the UI asks. In 'drive' / 'folder' mode the repo files are only defaults for files that
- * have no local copy yet; Drive conflicts are handled by sync.js.
+ * Load files from ./data (sample defaults), then overlay the localStorage working copy (the user's data,
+ * last opened from / saved to Drive). Returns { files, source, conflicts: [{ file, mine, theirs }] }.
+ * A conflict is only raised while the working copy is still sample data and the repo sample changed;
+ * real data (sample_data false or absent) is never compared with the repo.
  */
 export async function loadAll(base = '.') {
   const source = Object.fromEntries(await Promise.all(FILES.map(async (f) => [f, await fetchJson(`${base}/data/${f}.json`)])));
   const files = {};
   const conflicts = [];
-  const mode = getSource();
   for (const f of FILES) {
     const working = readWorking(f);
     if (!working) { files[f] = source[f]; continue; }
     files[f] = working.data;
-    if (mode === 'repo' && working.base_revision !== source[f].revision && working.base_revision !== undefined) {
+    if (working.data.sample_data === true && working.base_revision !== undefined && working.base_revision !== source[f].revision) {
       conflicts.push({ file: f, mine: working.data, theirs: source[f] });
     }
   }
@@ -212,6 +206,44 @@ export function removeSampleData(portfolio, sample, author = 'user', now = new D
   next.changelog.push({ date, file: 'portfolio', target: 'sample', field: 'holdings', old: removed, new: null, author,
     note: `données d'exemple retirées (${removed.length} lignes${hadAccounts ? ', ancien bloc accounts' : ''})` });
   return bump(next, portfolio, date);
+}
+
+// ---------------------------------------------------------------- single file "wealth-board.json"
+// The user's data lives in ONE file on Google Drive (source of truth): opened in the board, edited,
+// saved back (share sheet on phone, download on computer). Claude reads/edits the same file.
+export const BUNDLE_NAME = 'wealth-board.json';
+export const BUNDLE_FORMAT = 'wealth-board/1';
+
+/** { format, saved_at, portfolio, config, history } -- pretty JSON text. */
+export function makeBundle(files, now = new Date()) {
+  const bundle = { format: BUNDLE_FORMAT, saved_at: now.toISOString().replace(/\.\d{3}Z$/, 'Z'), portfolio: files.portfolio, config: files.config, history: files.history };
+  return JSON.stringify(bundle, null, 2) + '\n';
+}
+
+/**
+ * Read opened JSON objects: a bundle and/or separate portfolio / config / history files.
+ * Returns { files: { name: data }, problems: [string] } -- only the files that were found.
+ */
+export function readOpened(objects) {
+  const files = {}, problems = [];
+  for (const { name, obj } of objects) {
+    if (obj?.format === BUNDLE_FORMAT) {
+      for (const f of FILES) if (obj[f]) files[f] = obj[f];
+    } else if (Array.isArray(obj?.holdings)) files.portfolio = obj;
+    else if (Array.isArray(obj?.envelopes)) files.config = obj;
+    else if (Array.isArray(obj?.snapshots)) files.history = obj;
+    else problems.push(`${name} : format non reconnu (ni wealth-board.json, ni portfolio / config / history)`);
+  }
+  return { files, problems };
+}
+
+/** Download arbitrary text as a file. */
+export function downloadText(name, text, type = 'application/json') {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 /** Trigger a JSON download of a data file (export fallback, always available). */
