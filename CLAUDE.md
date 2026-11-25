@@ -156,6 +156,8 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - Local dev: `python -m http.server 8770` in the repo, open http://localhost:8770/ and /tests/.
 
 ## Real data: where it lives (never versioned)
+- **Portfolio questions:** first read `private/investor-profile.md` if it exists (the user's own rules, limits and
+  decisions log; git-ignored). Give figures against those rules, never buy/sell recommendations.
 - The user's REAL data never goes in the repo (public). It lives in `wealth-board.json` on Google Drive and in the
   git-ignored `private/` folder on this computer. `private/wealth-board.json` = seed built 2026-11-25 from the user's
   description (manual lines: Caisse d'Épargne, Gold Avenue, Swiss account, safe silver 16.84 kg fine, cash, IBKR
