@@ -8,6 +8,7 @@ import * as gold from '../src/providers/goldapi.js';
 import * as yp from '../src/providers/yahoo-proxy.js';
 import worker from '../tools/yahoo-proxy-worker.js';
 import { refreshPrices, mergeLive, persistPrices, liveFromCache } from '../src/prices.js';
+import { topMoves } from '../src/top-moves.js';
 
 const fx = async (name) => (await fetch(`./fixtures/${name}`, { cache: 'no-store' })).json();
 
@@ -21,7 +22,7 @@ export async function pricesTests({ test, assert, eq, files, schemas, validate, 
   const F = {
     frank: await fx('frankfurter.json'), ecb: await fx('ecb.json'), gold: await fx('goldapi-xau-eur.json'),
     tte: await fx('yahoo-chart-tte.json'), vod: await fx('yahoo-chart-vod-gbp.json'), volvo: await fx('yahoo-chart-volvo-sek.json'),
-    unknown: await fx('yahoo-chart-unknown.json'),
+    unknown: await fx('yahoo-chart-unknown.json'), san1mo: await fx('yahoo-chart-san-1mo.json'),
   };
 
   await test('Change : Frankfurter et BCE (deux sources) donnent les mêmes taux', () => {
@@ -53,7 +54,23 @@ export async function pricesTests({ test, assert, eq, files, schemas, validate, 
   });
 
   await test('Proxy : même résultat que l’adaptateur sur les vraies réponses', () => {
-    for (const f of [F.tte, F.vod, F.volvo]) eq(JSON.stringify(worker.parseChart(f)), JSON.stringify(yp.parseChart(f)), f.chart.result[0].meta.symbol);
+    for (const f of [F.tte, F.vod, F.volvo, F.san1mo]) eq(JSON.stringify(worker.parseChart(f)), JSON.stringify(yp.parseChart(f)), f.chart.result[0].meta.symbol);
+  });
+
+  await test('Yahoo 1 mois (Sanofi réel, 25/11/2026) : veille, ~1 semaine, ~1 mois depuis les clôtures du jour', () => {
+    const s = yp.parseChart(F.san1mo);
+    const r2 = (v) => Math.round(v * 100) / 100;
+    eq(r2(s.prev_close), 93.58, 'veille = dernière séance avant aujourd’hui (pas chartPreviousClose, qui précède la période)');
+    eq(r2(s.close_1w), 86.25, 'il y a ~7 jours');
+    eq(r2(s.close_1m), 74.58, 'il y a ~30 jours');
+    const old = yp.parseChart(F.tte);
+    assert(old.close_1w === undefined && old.close_1m === undefined, 'réponse 1 jour (ancien proxy) : pas de semaine / mois');
+  });
+
+  await test('Plus gros mouvements : 3 plus grandes variations en euros, hausse ou baisse, hors patrimoine exclu', () => {
+    const row = (id, week_base, in_total) => ({ id, week_base, ...(in_total === false ? { in_total } : {}) });
+    const top = topMoves([row('a', 120), row('b', -900), row('c', null), row('d', 450), row('e', 50), row('f', -2000, false), row('g', 0)]);
+    eq(top.map((r) => r.id).join(), 'b,d,a', 'ordre par valeur absolue');
   });
 
   await test('Proxy : origine, limites, CORS', async () => {

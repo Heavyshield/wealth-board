@@ -80,6 +80,10 @@ function columns(ctx) {
       cell: (r) => `<span class="${signCls(r.pnl_base)}">${fmt.signedMoney(r.pnl_base, base)}</span>` },
     { id: 'pnl_pct', label: '+/- %', num: true, sort: (r) => r.pnl_pct ?? -Infinity,
       cell: (r) => `<span class="${signCls(r.pnl_pct)}">${fmt.pct(r.pnl_pct)}</span>` },
+    { id: 'month_pct', label: '1 mois %', num: true, sort: (r) => r.month_pct ?? -Infinity,
+      cell: (r) => (r.month_pct === null || r.month_pct === undefined
+        ? '<span class="sub" title="Variation du cours sur 1 mois : cours en direct seulement (actions, ETF)">—</span>'
+        : `<span class="${signCls(r.month_pct)}" title="Cours actuel / clôture d’il y a ~1 mois">${fmt.pct(r.month_pct)}</span>`) },
     { id: 'pnl_fx', label: 'dont change', num: true, sort: (r) => r.pnl_fx_base ?? -Infinity,
       cell: (r) => (r.h.currency === base ? '—' : `<span class="${signCls(r.pnl_fx_base)}">${fmt.signedMoney(r.pnl_fx_base, base)}</span>${r.cost_fx_known ? '' : '<span class="sub" title="Ajouter cost_fx_rate pour isoler l\'effet de change">taux d\'achat inconnu</span>'}`) },
     { id: 'rules', label: 'Règles', sort: (r) => RULE_STATUS[r.rules?.status ?? 'na'].severity,
@@ -123,6 +127,12 @@ export class HoldingsTable {
       ['rules', 'm_per', 'm_pcf', 'm_net_debt_ebitda'].forEach((c) => this.visible.add(c));
       localStorage.setItem('wb.ui.columns', JSON.stringify([...this.visible]));
       localStorage.setItem('wb.ui.ratios_v1', '1');
+    }
+    // One-time: show the new 1-month change column (added 2026-11-25).
+    if (!localStorage.getItem('wb.ui.month_v1')) {
+      this.visible.add('month_pct');
+      localStorage.setItem('wb.ui.columns', JSON.stringify([...this.visible]));
+      localStorage.setItem('wb.ui.month_v1', '1');
     }
     this.render();
   }

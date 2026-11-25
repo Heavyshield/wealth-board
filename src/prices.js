@@ -179,7 +179,8 @@ export function persistPrices(portfolio, merged, author = 'user', now = new Date
   for (const h of next.holdings) {
     const q = merged.quotes[h.id];
     if (!q) continue;
-    h.last_price = { value: q.value, currency: q.currency, as_of: q.as_of, source: q.source, ...(q.prev_close ? { prev_close: q.prev_close } : {}) };
+    h.last_price = { value: q.value, currency: q.currency, as_of: q.as_of, source: q.source,
+      ...(q.prev_close ? { prev_close: q.prev_close } : {}), ...(q.close_1w ? { close_1w: q.close_1w } : {}), ...(q.close_1m ? { close_1m: q.close_1m } : {}) };
     n++;
   }
   next.changelog.push({ date, file: 'portfolio', target: 'market', field: 'prices', old: null, new: n, author, note: `${n} cours + change + métaux mémorisés` });

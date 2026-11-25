@@ -5,7 +5,7 @@
 //
 // GET /search?isins=FR0000121014,...  ->  { results: { ISIN: [{symbol, exchange, exchange_name, type, name}] }, errors }
 // GET /metrics?symbols=AI.PA,...       ->  { results: { SYM: { metrics: {per, pcf, net_debt_ebitda}, notes } }, errors, as_of }
-// GET /quotes?symbols=TTE.PA,VOLV-B.ST  ->  { quotes: { SYM: {value, currency, prev_close, as_of, source} },
+// GET /quotes?symbols=TTE.PA,VOLV-B.ST  ->  { quotes: { SYM: {value, currency, prev_close, close_1w, close_1m, as_of, source} },
 //                                            errors: { SYM: message }, fetched_at }
 // Self-contained on purpose (no imports) so it can be pasted as-is. Parsing mirrors
 // src/providers/yahoo-proxy.js parseChart(); tests/tests.js checks both give the same result.
@@ -38,17 +38,37 @@ function parseSearch(body) {
     .map((q) => ({ symbol: q.symbol, exchange: q.exchange ?? '', exchange_name: q.exchDisp ?? q.exchange ?? '', type: q.quoteType ?? '', name: q.longname ?? q.shortname ?? '' }));
 }
 
+// Mirrors closesFrom() in src/providers/yahoo-proxy.js.
+function closesFrom(r, m) {
+  const ts = r.timestamp ?? [], cl = r.indicators?.quote?.[0]?.close ?? [];
+  const off = m.gmtoffset ?? 0;
+  const day = (t) => Math.floor((t + off) / 86400);
+  const today = day(m.regularMarketTime);
+  const bars = ts.map((t, i) => [day(t), cl[i]]).filter(([, c]) => typeof c === 'number');
+  const onOrBefore = (d) => { let v; for (const [bd, c] of bars) if (bd <= d) v = c; return v; };
+  const first = bars[0];
+  return {
+    prev: onOrBefore(today - 1),
+    w: onOrBefore(today - 7),
+    mo: onOrBefore(today - 30) ?? (first && first[0] <= today - 25 ? first[1] : undefined),
+  };
+}
+
 function parseChart(body) {
   const r = body?.chart?.result?.[0];
   if (!r) throw new Error(body?.chart?.error?.description ?? 'symbole inconnu');
   const m = r.meta;
   if (typeof m.regularMarketPrice !== 'number') throw new Error('cours absent');
   const [currency, factor] = MINOR[m.currency] ?? [m.currency, 1];
-  const prev = m.chartPreviousClose ?? m.previousClose;
+  const c = closesFrom(r, m);
+  const prev = c.prev ?? (m.range && m.range !== '1d' ? m.previousClose : m.chartPreviousClose ?? m.previousClose);
+  const per = (v) => (typeof v === 'number' ? v / factor : undefined);
   return {
     value: m.regularMarketPrice / factor,
     currency,
-    prev_close: typeof prev === 'number' ? prev / factor : undefined,
+    prev_close: per(prev),
+    close_1w: per(c.w),
+    close_1m: per(c.mo),
     as_of: new Date(m.regularMarketTime * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
     source: 'Yahoo (proxy)',
   };
@@ -168,7 +188,7 @@ async function handle(request, env = {}, upstream = fetch) {
   const quotes = {}, errors = {};
   await Promise.all(symbols.map(async (s) => {
     try {
-      const res = await upstream(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?range=1d&interval=1d`, {
+      const res = await upstream(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?range=1mo&interval=1d`, {
         headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' },
         cf: { cacheTtl: 60, cacheEverything: true },
       });

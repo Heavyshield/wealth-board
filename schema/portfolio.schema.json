@@ -170,6 +170,14 @@
           "type": "number",
           "exclusiveMinimum": 0
         },
+        "close_1w": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "close_1m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "currency": {
           "$ref": "#/$defs/currency"
         },

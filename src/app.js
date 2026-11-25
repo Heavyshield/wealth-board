@@ -8,6 +8,7 @@ import * as viz from './charts.js';
 import { evaluateRules, evaluateConstraints, reviewItems } from './rules.js';
 import { renderReview, renderConstraints } from './review.js';
 import { renderPerRank } from './per-rank.js';
+import { renderTopMoves } from './top-moves.js';
 import * as prices from './prices.js';
 import { initImport } from './import-ui.js';
 import { createEditors } from './editors.js';
@@ -91,6 +92,7 @@ function render() {
   renderJournal($('#journal'), portfolio);
   renderConstraints($('#constraints'), constraints);
   renderPerRank($('#per-rank'), rows, config, { onSelect: focusTarget });
+  renderTopMoves($('#top-moves'), rows, config, { onSelect: focusTarget });
   $('#sample-banner').hidden = !portfolio.sample_data;
   $('#rev').textContent = `rév. ${portfolio.revision}`;
   app.dataUI?.updateBadge();

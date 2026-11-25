@@ -63,7 +63,7 @@ export function resolvePrice(h, pricing, market, config, now, quotes = {}) {
   const p = quotes[h.id] ?? h.last_price;
   if (!p) return missing(h);
   const status = ageHours(p.as_of, now) > (stale.quote ?? 72) ? 'stale' : 'live';
-  return { value: p.value, prev_close: p.prev_close, currency: p.currency ?? h.currency, as_of: p.as_of, source: p.source ?? 'cache', status };
+  return { value: p.value, prev_close: p.prev_close, close_1w: p.close_1w, close_1m: p.close_1m, currency: p.currency ?? h.currency, as_of: p.as_of, source: p.source ?? 'cache', status };
 }
 
 function missing(h) {
@@ -117,6 +117,10 @@ export function valueHoldings({ portfolio, config, now = new Date(), quotes = {}
       region: regionOf(h, config, pricing),
       // Day change: only from a fresh market price with a previous close; otherwise null (not 0).
       day_base: !toFill && price.status === 'live' && price.prev_close ? fx.convert(h.quantity * (price.value - price.prev_close), price.currency) : null,
+      // Week / month: market move of the CURRENT quantity (trades in between ignored), today's FX; quote prices only.
+      week_base: !toFill && price.status === 'live' && price.close_1w ? fx.convert(h.quantity * (price.value - price.close_1w), price.currency) : null,
+      week_pct: price.status === 'live' && price.close_1w ? price.value / price.close_1w - 1 : null,
+      month_pct: price.status === 'live' && price.close_1m ? price.value / price.close_1m - 1 : null,
       value_local: valueLocal,
       value_base: valueBase,
       value_base_cents: valueBase === null ? null : toCents(valueBase),

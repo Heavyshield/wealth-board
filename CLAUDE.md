@@ -63,7 +63,8 @@ to detect that a file changed under a local copy and asks the user instead of ov
   `asset_class` (id from config.asset_classes), `ticker?`, `isin?`, `region?`, `quantity`, `unit_cost`
   (in `currency`), `cost_fx_rate?` (FX rate at purchase, base->currency, isolates the currency effect),
   `currency`, `price_source`, `manual_price?` `{value, as_of, currency?, source?}`,
-  `last_price?` (last known market price; optional `prev_close` enables the day change), `metal?` `{code, weight, unit: g|oz|kg, purity 0..1}`,
+  `last_price?` (last known market price; optional `prev_close` enables the day change, `close_1w` / `close_1m` the
+  week / month change), `metal?` `{code, weight, unit: g|oz|kg, purity 0..1}`,
   `tags[]`, `notes`, `metrics?` `{per, pcf, net_debt_ebitda, as_of}`, `updated_at`.
 - `accounts[]`: legacy (PEA ceiling widget removed 2026-11-25 at the user's request: PEA is full). Still accepted by
   the schema so old local copies load; ignored. Do not reintroduce a ceiling tracker unless asked.
@@ -115,6 +116,11 @@ to detect that a file changed under a local copy and asks the user instead of ov
 5. Region = `region` field > `regions.by_pricing[pricing]` > `regions.by_country[ISIN prefix]` > `unknown_label`.
 6. Day change = qty x (price - prev_close) / rate, only for **live** prices with a `prev_close`
    (quotes, or spot `prev_close`). Shown with its coverage ("calculée sur 33 % de la valeur"); never 0 by default.
+7. Week / month (2026-11-25): proxy /quotes asks Yahoo `range=1mo&interval=1d`; `closesFrom` takes the last daily
+   close on or before today-1 (prev_close), today-7 (`close_1w`), today-30 (`close_1m`, or the first bar if >= 25 days
+   back), exchange-local days. Rows: `week_base` = qty x (price - close_1w) at today's FX (market move of what is held,
+   trades ignored), `week_pct`, `month_pct`; live quotes only, else null. UI: "Plus gros mouvements de la semaine"
+   card (src/top-moves.js, top 3 by |week_base|) and the "1 mois %" column. Needs the worker redeployed.
 
 ## Charts (src/charts.js) -- rules followed
 - Chart.js 4.6.2 from cdnjs, `defer` + SRI sha512 in index.html. If it fails, a banner shows and tables still render.

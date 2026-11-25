@@ -4,18 +4,43 @@
 // Proxy URL lives in localStorage settings ("yahoo_proxy_url"), not in the public repo.
 import { getJson, ProviderError, normalizeCurrency, isoFromUnix } from './common.js';
 
-/** Parse one Yahoo v8 chart response (range=1d) -> Price. Used by the worker and the tests. */
+/**
+ * Daily closes of a chart response (worker asks range=1mo&interval=1d): close of the previous session,
+ * ~1 week ago and ~1 month ago (last close on or before that day; undefined when the range does not reach it).
+ * Days are counted in the exchange's local time (gmtoffset). Mirrored in the worker.
+ */
+export function closesFrom(r, m) {
+  const ts = r.timestamp ?? [], cl = r.indicators?.quote?.[0]?.close ?? [];
+  const off = m.gmtoffset ?? 0;
+  const day = (t) => Math.floor((t + off) / 86400);
+  const today = day(m.regularMarketTime);
+  const bars = ts.map((t, i) => [day(t), cl[i]]).filter(([, c]) => typeof c === 'number');
+  const onOrBefore = (d) => { let v; for (const [bd, c] of bars) if (bd <= d) v = c; return v; };
+  const first = bars[0];
+  return {
+    prev: onOrBefore(today - 1),
+    w: onOrBefore(today - 7),
+    mo: onOrBefore(today - 30) ?? (first && first[0] <= today - 25 ? first[1] : undefined),
+  };
+}
+
+/** Parse one Yahoo v8 chart response -> Price (+ close_1w / close_1m when the range covers them). Used by the worker and the tests. */
 export function parseChart(body) {
   const r = body?.chart?.result?.[0];
   if (!r) throw new ProviderError(body?.chart?.error?.description ?? 'symbole inconnu');
   const m = r.meta;
   if (typeof m.regularMarketPrice !== 'number') throw new ProviderError('cours absent');
   const n = normalizeCurrency(m.regularMarketPrice, m.currency);
-  // chartPreviousClose (range=1d) = close before the current session: the base for "today's change".
-  const prev = m.chartPreviousClose ?? m.previousClose;
+  const c = closesFrom(r, m);
+  // range=1d: chartPreviousClose = close before the current session. Longer ranges: it is the close before the
+  // range, so the previous session comes from the daily bars instead.
+  const prev = c.prev ?? (m.range && m.range !== '1d' ? m.previousClose : m.chartPreviousClose ?? m.previousClose);
+  const per = (v) => (typeof v === 'number' ? v / n.factor : undefined);
   return {
     value: n.value, currency: n.currency,
-    prev_close: typeof prev === 'number' ? prev / n.factor : undefined,
+    prev_close: per(prev),
+    close_1w: per(c.w),
+    close_1m: per(c.mo),
     as_of: isoFromUnix(m.regularMarketTime),
     source: 'Yahoo (proxy)',
   };
