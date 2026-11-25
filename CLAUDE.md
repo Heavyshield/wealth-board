@@ -28,6 +28,7 @@ src/table.js        holdings table (column defs, sort, filters, picker, inline e
 src/charts.js       KPI tiles + charts (allocation donut, history line, actual vs target, P&L bars)
 src/rules.js        pure: rule status per line, constraint evaluation, ranked review items
 src/review.js       UI: "À revoir" list (click = jump to the line) + constraint meters
+src/per-rank.js     "Actions par PER" card: equity lines only, PER ascending, negative then n/d last (rankByPer pure)
 src/prices.js       orchestration: needs, localStorage cache + TTL, fallback chains, batching, mergeLive, persistPrices
 src/providers/*.js  one adapter per source (common.js = interface + helpers); pure parse() tested on real fixtures
 tools/yahoo-proxy-worker.js  Cloudflare Worker the user deploys (Yahoo has no CORS); self-contained
@@ -221,7 +222,10 @@ to detect that a file changed under a local copy and asks the user instead of ov
   (`config.imports.boursorama.columns`, case/accent-insensitive); the dialog shows the mapping found. If a column is
   not recognised, add its exact header to the aliases -- never hardcode in JS.
 - Diff is per envelope and only for quote-priced classes (cash/accounts/metals untouched). Match by ISIN, then name.
-  Added lines get id `<envelope>-<name-slug>`, class guessed from `etf_name_pattern`, NO ticker (to fill for live price).
+  Added lines get id `<envelope>-<name-slug>`, class guessed from `etf_name_pattern`, no ticker from the file.
+- Tickers (2026-11-25): new lines + existing quote lines of the envelope without ticker are looked up by ISIN via the
+  proxy /search (`tickerCandidates`, `bestListing` + `preferred_exchanges`), shown ticked in a "Tickers" block of the
+  same dialog, applied by `applyImport(..., { tickers })` (changelog field `ticker`). No proxy / error = note only.
 - Deletions are ticked by default, except when deletions >= matched lines (wrong envelope / partial export): warning,
   all unticked. A deleted line is kept in full in the changelog (`old`). File prices become `last_price` only if newer
   (as_of = date in the file name, else the file's modification time).

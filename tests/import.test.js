@@ -4,7 +4,7 @@
 // ETF Monde 25 x 80).
 
 import { decode, parseCsv, parseLooseNumber, dateFromFileName } from '../src/csv.js';
-import { readPositions, diffPositions, applyImport } from '../src/importer.js';
+import { readPositions, diffPositions, applyImport, tickerCandidates } from '../src/importer.js';
 
 const bytes = async (name) => new Uint8Array(await (await fetch(`./fixtures/${name}`, { cache: 'no-store' })).arrayBuffer());
 
@@ -91,5 +91,23 @@ export async function importTests({ test, assert, eq, files, schemas, validate, 
     const removedAll = applyImport(files.portfolio, diff, { added: new Set(), changed: new Set(), removed: new Set(['pea-demo-energie']) }, { label: 't', now: NOW });
     const log = removedAll.changelog.at(-1);
     eq(log.new, 'suppression', 'suppression journalisée'); eq(log.old.id, 'pea-demo-energie', 'ligne complète gardée dans le journal');
+  });
+
+  await test('Tickers par ISIN : candidats (nouvelles lignes + lignes sans ticker), appliqués et journalisés', () => {
+    const p = structuredClone(files.portfolio);
+    delete p.holdings.find((h) => h.id === 'pea-exemple-industries').ticker;
+    const d = diffPositions(read.positions, p, files.config, 'pea', profile);
+    const cands = tickerCandidates(d, p, files.config, 'pea');
+    eq(cands.map((c) => `${c.id}:${c.isNew}`).join(), 'pea-nouvelle-societe-fictive:true,pea-tracker-msci-exemple-fictif:true,pea-exemple-industries:false', 'candidats');
+    assert(!cands.some((c) => c.id === 'pea-etf-monde'), 'ligne avec ticker ignorée');
+    const none = { added: new Set(), changed: new Set(), removed: new Set() };
+    const next = applyImport(p, d, none, { label: 't', now: NOW, tickers: { 'pea-exemple-industries': 'EXA.PA', 'pea-nouvelle-societe-fictive': 'NSF.PA' } });
+    assert(validate(schemas.portfolio, next).length === 0, JSON.stringify(validate(schemas.portfolio, next).slice(0, 3)));
+    eq(next.holdings.find((h) => h.id === 'pea-exemple-industries').ticker, 'EXA.PA', 'ticker posé sur la ligne existante');
+    assert(!next.holdings.some((h) => h.id === 'pea-nouvelle-societe-fictive'), 'nouvelle ligne non cochée : ni ajoutée ni ticker');
+    const log = next.changelog.at(-1);
+    eq(`${log.target}.${log.field} ${log.old} -> ${log.new}`, 'pea-exemple-industries.ticker null -> EXA.PA', 'journal');
+    const added = applyImport(p, d, { ...none, added: new Set(['pea-nouvelle-societe-fictive']) }, { label: 't', now: NOW, tickers: { 'pea-nouvelle-societe-fictive': 'NSF.PA' } });
+    eq(added.holdings.find((h) => h.id === 'pea-nouvelle-societe-fictive').ticker, 'NSF.PA', 'ticker de la nouvelle ligne');
   });
 }

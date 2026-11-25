@@ -109,11 +109,28 @@ export function diffPositions(positions, portfolio, config, envelope, profile) {
 }
 
 /**
+ * Lines of this import that could get a ticker from their ISIN: new lines without one, plus existing
+ * quote-priced lines of the envelope still without ticker (manual prices excluded). Returns [{ id, name, isin, isNew }].
+ */
+export function tickerCandidates(diff, portfolio, config, envelope) {
+  const pricing = Object.fromEntries(config.asset_classes.map((c) => [c.id, c.pricing]));
+  const removed = new Set(diff.removed.map((r) => r.holding.id));
+  const fresh = diff.added.filter((a) => !a.holding.ticker && a.holding.isin)
+    .map((a) => ({ id: a.holding.id, name: a.holding.name, isin: a.holding.isin, isNew: true }));
+  const existing = portfolio.holdings
+    .filter((h) => h.envelope === envelope && pricing[h.asset_class] === 'quote' && !removed.has(h.id)
+      && !h.ticker && h.isin && !h.manual_price && h.price_source !== 'manual')
+    .map((h) => ({ id: h.id, name: h.name, isin: h.isin, isNew: false }));
+  return [...fresh, ...existing];
+}
+
+/**
  * Apply the selected parts of a diff. `pick` = { added: Set(ids), changed: Set(ids), removed: Set(ids) }.
+ * `tickers` = { holdingId: symbol } found from the ISIN (optional; a new line gets it only if it is added).
  * `price` = { as_of, source } to store file prices as last_price when newer (optional).
  * Returns a NEW portfolio (revision+1) with one changelog entry per change (author user, note = import label).
  */
-export function applyImport(portfolio, diff, pick, { label, now = new Date(), price } = {}) {
+export function applyImport(portfolio, diff, pick, { label, now = new Date(), price, tickers = {} } = {}) {
   const date = now.toISOString().replace(/\.\d{3}Z$/, 'Z');
   const next = structuredClone(portfolio);
   const log = (target, field, old, nw) => next.changelog.push({ date, file: 'portfolio', target, field, old: old ?? null, new: nw ?? null, author: 'user', note: label });
@@ -142,6 +159,13 @@ export function applyImport(portfolio, diff, pick, { label, now = new Date(), pr
     if (!pick.removed.has(r.holding.id)) continue;
     next.holdings = next.holdings.filter((x) => x.id !== r.holding.id);
     log(r.holding.id, 'holding', r.holding, 'suppression'); // full old line kept in the changelog
+  }
+  for (const [id, symbol] of Object.entries(tickers)) {
+    const h = next.holdings.find((x) => x.id === id);
+    if (!h || !symbol || h.ticker === symbol) continue; // new line not ticked, or removed
+    log(id, 'ticker', h.ticker, symbol);
+    h.ticker = symbol;
+    h.updated_at = date;
   }
   next.revision = portfolio.revision + 1;
   next.updated_at = date;

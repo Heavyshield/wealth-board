@@ -7,6 +7,7 @@ import { HoldingsTable } from './table.js';
 import * as viz from './charts.js';
 import { evaluateRules, evaluateConstraints, reviewItems } from './rules.js';
 import { renderReview, renderConstraints } from './review.js';
+import { renderPerRank } from './per-rank.js';
 import * as prices from './prices.js';
 import { initImport } from './import-ui.js';
 import { createEditors } from './editors.js';
@@ -89,6 +90,7 @@ function render() {
   renderReview($('#review'), app.review, { onSelect: focusTarget });
   renderJournal($('#journal'), portfolio);
   renderConstraints($('#constraints'), constraints);
+  renderPerRank($('#per-rank'), rows, config, { onSelect: focusTarget });
   $('#sample-banner').hidden = !portfolio.sample_data;
   $('#rev').textContent = `rév. ${portfolio.revision}`;
   app.dataUI?.updateBadge();
@@ -356,8 +358,8 @@ async function main() {
         if (errs.portfolio) { toast(`Import refusé : ${errs.portfolio[0].path} : ${errs.portfolio[0].message}`, 'error'); return false; }
         saveLocal('portfolio', next);
         render();
-        toast(`Import appliqué (rév. ${next.revision}) : ${n.added} ajout(s), ${n.changed} modification(s), ${n.removed} suppression(s). Voir le journal.`);
-        if (n.added) refreshPrices(false);
+        toast(`Import appliqué (rév. ${next.revision}) : ${n.added} ajout(s), ${n.changed} modification(s), ${n.removed} suppression(s)${n.tickers ? `, ${n.tickers} ticker(s)` : ''}. Voir le journal.`);
+        if (n.added || n.tickers) refreshPrices(false);
         return true;
       },
     });

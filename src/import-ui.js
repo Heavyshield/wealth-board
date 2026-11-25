@@ -1,10 +1,14 @@
 // Import dialog: pick profile + envelope + CSV file -> show detected format, column mapping,
 // problems and the diff (each line has a checkbox) -> apply only what is ticked.
-// The file is read locally in the browser; nothing is uploaded anywhere.
+// The file is read locally in the browser; nothing is uploaded anywhere. Lines without ticker
+// (new or already there) get one suggested from their ISIN through the user's Yahoo proxy (/search),
+// shown as ticked lines in the same dialog, so PER / ratios can be fetched afterwards.
 
 import * as fmt from './format.js';
 import { decode, dateFromFileName } from './csv.js';
-import { readPositions, diffPositions, applyImport } from './importer.js';
+import { readPositions, diffPositions, applyImport, tickerCandidates } from './importer.js';
+import { searchIsins, bestListing } from './providers/yahoo-proxy.js';
+import { loadSettings } from './prices.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const FIELD_LABEL = { isin: 'ISIN', name: 'Nom', quantity: 'Quantité', unit_cost: 'PRU', last_price: 'Cours', currency: 'Devise', ticker: 'Ticker' };
@@ -15,6 +19,7 @@ const SEP_LABEL = { ';': 'point-virgule', ',': 'virgule', '\t': 'tabulation' };
  */
 export function initImport({ dialog, openButton, getState, onApply }) {
   let current = null; // { diff, profile, file, priceAsOf }
+  let seq = 0; // ignore a ticker search that finishes after the file / envelope changed
 
   function shell() {
     const { config } = getState();
@@ -77,7 +82,7 @@ export function initImport({ dialog, openButton, getState, onApply }) {
       ${read.problems.length ? `<div class="import-problems"><p>⚠ ${read.problems.length} point(s) à vérifier :</p><ul>${read.problems.slice(0, 20).map((p) => `<li>${esc(p)}</li>`).join('')}</ul></div>` : ''}
       <p class="import-summary">${diff.added.length} ajout(s) · ${diff.changed.length} modification(s) · ${diff.removed.length} suppression(s) · ${diff.unchanged} inchangée(s)</p>
       ${diff.added.length ? `<h3>Ajouts</h3><table class="mini diff"><tbody>${diff.added.map((a) => `<tr class="d-add"><td>${box('added', a.holding.id, `Ajouter ${a.holding.name}`)}</td>
-        <td><strong>${esc(a.holding.name)}</strong><span class="sub">${esc(a.holding.isin ?? '')} · ${a.holding.asset_class === 'etf' ? 'ETF (deviné d\'après le nom)' : 'Action'} · pas de ticker : à compléter pour le cours en direct</span></td>
+        <td><strong>${esc(a.holding.name)}</strong><span class="sub">${esc(a.holding.isin ?? '')} · ${a.holding.asset_class === 'etf' ? 'ETF (deviné d\'après le nom)' : 'Action'} · ticker : voir plus bas</span></td>
         <td class="num">${val('quantity', a.holding.quantity)} × ${val('unit_cost', a.holding.unit_cost, a.holding)}</td></tr>`).join('')}</tbody></table>` : ''}
       ${diff.changed.length ? `<h3>Modifications</h3><table class="mini diff"><tbody>${diff.changed.map((c) => `<tr class="d-chg"><td>${box('changed', c.holding.id, `Modifier ${c.holding.name}`)}</td>
         <td><strong>${esc(c.holding.name)}</strong></td>
@@ -87,13 +92,46 @@ export function initImport({ dialog, openButton, getState, onApply }) {
         : '<p class="sub">Lignes de cette enveloppe qui ne sont plus dans l’export (vendues ?). Décochez pour les garder.</p>'}
         <table class="mini diff"><tbody>${diff.removed.map((r) => `<tr class="d-del"><td>${box('removed', r.holding.id, `Supprimer ${r.holding.name}`)}</td>
         <td><strong>${esc(r.holding.name)}</strong><span class="sub">${esc(r.holding.isin ?? '')}</span></td><td class="num">${val('quantity', r.holding.quantity)} titres</td></tr>`).join('')}</tbody></table>` : ''}
-      ${!diff.added.length && !diff.changed.length && !diff.removed.length ? '<p>Tout est déjà à jour.</p>' : ''}`;
+      ${!diff.added.length && !diff.changed.length && !diff.removed.length ? '<p>Tout est déjà à jour.</p>' : ''}
+      <div class="import-tickers"></div>`;
     const refreshCount = () => {
-      const n = dialog.querySelectorAll('[data-pick]:checked').length;
+      const n = dialog.querySelectorAll('[data-pick]:checked, [data-ticker]:checked').length;
       applyBtn.disabled = n === 0;
       applyBtn.textContent = n ? `Appliquer ${n} changement${n > 1 ? 's' : ''}` : 'Appliquer';
     };
     out.querySelectorAll('[data-pick]').forEach((c) => c.addEventListener('change', refreshCount));
+    refreshCount();
+    lookupTickers(out.querySelector('.import-tickers'), tickerCandidates(diff, portfolio, config, envelope), config, refreshCount);
+  }
+
+  /** ISIN -> suggested ticker for each candidate line; failures only show a note (the import still works). */
+  async function lookupTickers(box, cands, config, refreshCount) {
+    const token = ++seq;
+    if (!cands.length) return;
+    const settings = loadSettings();
+    if (!settings.yahoo_proxy_url) {
+      box.innerHTML = `<p class="sub">${cands.length} ligne(s) sans ticker : renseignez l’URL du proxy (Réglages) pour les compléter automatiquement.</p>`;
+      return;
+    }
+    box.innerHTML = `<h3>Tickers</h3><p><span class="spinner" aria-hidden="true"></span> Recherche des tickers par ISIN…</p>`;
+    let found;
+    try {
+      found = await searchIsins([...new Set(cands.map((c) => c.isin))], { settings, base: config.base_currency });
+    } catch (e) {
+      if (token === seq) box.innerHTML = `<div class="import-problems"><p>Tickers non recherchés : ${esc(e.message)}. Utilisez « Compléter » après l’import.</p></div>`;
+      return;
+    }
+    if (token !== seq) return;
+    const pref = config.providers?.preferred_exchanges ?? [];
+    box.innerHTML = `<h3>Tickers</h3><p class="sub">Trouvés d’après l’ISIN (Yahoo, via votre proxy). Vérifiez la place de cotation ; ils servent aux cours en direct et aux ratios (PER).</p>
+      <table class="mini diff"><tbody>${cands.map((c) => {
+        const { pick, candidates } = bestListing(found.results[c.isin] ?? [], pref);
+        return `<tr><td><input type="checkbox" data-ticker="${esc(c.id)}"${pick ? ' checked' : ' disabled'} aria-label="Ticker pour ${esc(c.name)}"></td>
+          <td><strong>${esc(c.name)}</strong><span class="sub">${esc(c.isin)}${c.isNew ? ' · nouvelle ligne' : ''}</span></td>
+          <td>${pick ? `<select data-ticker-sym="${esc(c.id)}" aria-label="Cotation pour ${esc(c.name)}">${candidates.map((x) => `<option value="${esc(x.symbol)}">${esc(x.symbol)} — ${esc(x.exchange_name)} (${esc(x.type)})</option>`).join('')}</select>`
+            : `<span class="sub">${esc(found.errors[c.isin] ?? 'introuvable')}</span>`}</td></tr>`;
+      }).join('')}</tbody></table>`;
+    box.querySelectorAll('[data-ticker]').forEach((c) => c.addEventListener('change', refreshCount));
     refreshCount();
   }
 
@@ -101,10 +139,15 @@ export function initImport({ dialog, openButton, getState, onApply }) {
     if (!current) return;
     const picked = { added: new Set(), changed: new Set(), removed: new Set() };
     dialog.querySelectorAll('[data-pick]:checked').forEach((c) => picked[c.dataset.pick].add(c.value));
+    const tickers = {};
+    dialog.querySelectorAll('[data-ticker]:checked').forEach((c) => {
+      const sym = dialog.querySelector(`[data-ticker-sym="${CSS.escape(c.dataset.ticker)}"]`)?.value;
+      if (sym) tickers[c.dataset.ticker] = sym;
+    });
     const { portfolio } = getState();
     const label = `import ${current.profile.label} (${current.file.name})`;
-    const next = applyImport(portfolio, current.diff, picked, { label, price: { as_of: current.priceAsOf, source: current.profile.label } });
-    const ok = onApply(next, { added: picked.added.size, changed: picked.changed.size, removed: picked.removed.size });
+    const next = applyImport(portfolio, current.diff, picked, { label, price: { as_of: current.priceAsOf, source: current.profile.label }, tickers });
+    const ok = onApply(next, { added: picked.added.size, changed: picked.changed.size, removed: picked.removed.size, tickers: Object.keys(tickers).length });
     if (ok) dialog.close();
   }
 

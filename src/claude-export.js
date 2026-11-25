@@ -48,7 +48,7 @@ export function buildClaudeExport({ rows, files, constraints = [], review = [], 
   const L = (s = '') => lines.push(s);
 
   L(`# Wealth Board — résumé du ${now.toLocaleDateString('fr-FR')} ${now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`);
-  L(`Données personnelles, à ne pas partager. Outil de suivi, pas un conseil en investissement.`);
+  L(`Données personnelles, à ne pas partager.`);
   L(`Portefeuille rév. ${portfolio.revision}${portfolio.sample_data ? ' (DONNÉES D’EXEMPLE)' : ''} · cours vérifiés : ${refreshedAt ? new Date(refreshedAt).toLocaleString('fr-FR') : 'non (prix du fichier)'}`);
   L();
   L('## Synthèse');

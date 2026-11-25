@@ -24,7 +24,7 @@ export async function stageGTests({ test, assert, eq, files, schemas, validate, 
     const p = structuredClone(files.portfolio);
     p.changelog.push({ date: '2026-11-24T21:00:00Z', file: 'portfolio', target: 'livret-a', field: 'quantity', old: 12000, new: 12500, author: 'claude' });
     const text = buildClaudeExport({ rows, files: { ...files, portfolio: p }, review, now: NOW });
-    assert(text.includes('pas un conseil en investissement'), 'avertissement');
+    assert(text.includes('Données personnelles, à ne pas partager.') && !text.includes('pas un conseil en investissement'), 'avertissement');
     assert(text.includes('DONNÉES D’EXEMPLE'), 'exemple signalé');
     assert(text.includes('[critique] Poche métaux'), 'à revoir');
     assert(text.includes('claude · livret-a.quantity : 12000 → 12500'), 'modification de Claude listée');

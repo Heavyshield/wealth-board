@@ -4,6 +4,7 @@
 import worker from '../tools/yahoo-proxy-worker.js';
 import { metricTargets, fetchMetrics, applyMetrics } from '../src/metrics.js';
 import { evaluateHolding } from '../src/rules.js';
+import { rankByPer } from '../src/per-rank.js';
 
 const fx = async (n) => (await fetch(`./fixtures/yahoo-summary-${n}.json`, { cache: 'no-store' })).json();
 
@@ -80,5 +81,12 @@ export async function metricsTests({ test, assert, eq, files, schemas, validate,
     // a second pass overwrites Yahoo values (not manual ones)
     const again = applyMetrics(r.portfolio, metricTargets(r.portfolio, files.config), fetched, NOW);
     assert(again.updated.includes('cto-sample-corp'), 'Yahoo rafraîchi');
+  });
+
+  await test('Actions par PER : actions seulement, PER croissant, négatifs puis n/d en fin', () => {
+    const row = (id, cls, per, value) => ({ id, value_base: value, h: { asset_class: cls, ...(per === undefined ? {} : { metrics: { per } }) } });
+    const ranked = rankByPer([row('a', 'equity', 34, 10), row('b', 'equity', 9, 5), row('c', 'etf', 3, 50), row('d', 'equity', -4, 1),
+      row('e', 'equity', undefined, 7), row('f', 'equity', 14, 2), row('g', 'equity', undefined, 20)]);
+    eq(ranked.map((r) => r.id).join(), 'b,f,a,d,g,e', 'ordre (n/d par valeur décroissante)');
   });
 }
