@@ -9,6 +9,7 @@ import * as fmt from '../src/format.js';
 import { pricesTests } from './prices.test.js';
 import { importTests } from './import.test.js';
 import { editingTests } from './editing.test.js';
+import { syncTests } from './sync.test.js';
 import { evaluateRules, evaluateHolding, evaluateConstraints, reviewItems } from '../src/rules.js';
 
 const results = [];
@@ -184,12 +185,6 @@ await test('Règles : une règle ajoutée dans le JSON seul s’applique (métri
 
 const cons = Object.fromEntries(evaluateConstraints(rows, files.portfolio, files.config).map((c) => [c.id, c]));
 
-await test('Contrainte plafond PEA : 23 400 / 150 000 versés', () => {
-  eq(cons['pea-ceiling'].state, 'ok', 'état');
-  eq(cons['pea-ceiling'].remaining, 126600, 'reste');
-  eq(Math.round(cons['pea-ceiling'].ratio * 1000), 156, 'ratio 15,6 %');
-});
-
 await test('Contrainte poche métaux : 10 067,20 / 48 392,14 = 20,8 % > 20 %', () => {
   eq(cons['metals-pocket'].state, 'breach', 'état');
   eq(Math.round(cons['metals-pocket'].share * 1000), 208, 'part');
@@ -226,10 +221,10 @@ await test('Édition de métrique (chemin metrics.per) + suppression', () => {
 
 await test('Contrôle croisé : contrainte et règle avec ids inconnus', () => {
   const cfg = structuredClone(files.config);
-  cfg.constraints[0].envelope = 'pea_typo';
+  cfg.constraints.find((c) => c.type === 'runway').liquid = { asset_class: ['cashh'] };
   cfg.rules.items[0].applies_to = { asset_class: ['equities'] };
   const text = JSON.stringify(crossCheck(files.portfolio, cfg));
-  assert(text.includes('pea_typo') && text.includes('equities'), text);
+  assert(text.includes('cashh') && text.includes('equities'), text);
 });
 
 // ---------------------------------------------------------------- stage d: prices
@@ -240,6 +235,9 @@ await importTests({ test, assert, eq, files, schemas, validate, NOW });
 
 // ---------------------------------------------------------------- tickers + editing
 await editingTests({ test, assert, eq, files, schemas, validate, NOW });
+
+// ---------------------------------------------------------------- stage f: Drive sync
+await syncTests({ test, assert, eq, files, schemas, validate, NOW });
 
 const failed = results.filter((r) => !r.ok);
 window.testResults = { pass: results.length - failed.length, fail: failed.length, results };

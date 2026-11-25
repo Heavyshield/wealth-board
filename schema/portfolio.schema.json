@@ -141,7 +141,8 @@
             "type": "string"
           }
         }
-      }
+      },
+      "description": "Legacy (PEA ceiling widget, removed 2026-11-25): accepted so old local copies still load, ignored by the app."
     }
   },
   "$defs": {

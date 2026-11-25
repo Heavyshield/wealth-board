@@ -1,7 +1,6 @@
 // Editing dialogs that write into the portfolio (always through data.js, so every change is logged):
 //   - ticker assistant: ISIN -> Yahoo listing via the proxy, user confirms each line
 //   - line editor: add / edit / delete one holding (any class: stocks, accounts, cash, metals)
-//   - account editor: envelope facts (e.g. PEA contributions for the ceiling widget)
 // All dialogs render into one <dialog>; `commit(nextPortfolio, message)` validates + saves (app.js).
 
 import * as fmt from './format.js';
@@ -168,29 +167,5 @@ export function createEditors({ dialog, getState, commit }) {
     });
   }
 
-  // ------------------------------------------------------------ account facts (contributions)
-  function openAccount(envelope) {
-    const { portfolio, config } = getState();
-    const env = config.envelopes.find((e) => e.id === envelope);
-    const a = (portfolio.accounts ?? []).find((x) => x.envelope === envelope) ?? {};
-    show(`<form method="dialog" class="editor" novalidate><h2>Versements — ${esc(env?.label ?? envelope)}</h2>
-      <p class="sub-title">Total des versements (pas la valeur actuelle), tel qu'indiqué par la banque.</p>
-      <div class="ed-grid">
-        <label class="field"><span>Total versé (${esc(env?.currency ?? config.base_currency)})</span><input name="contributions" inputmode="decimal" value="${a.contributions ?? ''}"></label>
-        <label class="field"><span>À la date du</span><input name="as_of" type="date" value="${esc(a.as_of ?? today())}"></label>
-        <label class="field"><span>Ouverture du compte</span><input name="opened" type="date" value="${esc(a.opened ?? '')}"></label>
-      </div><p class="ed-error errors" hidden></p>
-      <div class="dialog-actions"><button type="button" data-close>Annuler</button><button type="submit" class="primary">Enregistrer</button></div></form>`);
-    const form = dialog.querySelector('form');
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const c = num(form.contributions.value);
-      const err = form.querySelector('.ed-error');
-      if (!(c >= 0) || !form.as_of.value) { err.textContent = 'Montant ≥ 0 et date obligatoires.'; err.hidden = false; return; }
-      const next = data.setAccount(getState().portfolio, envelope, { contributions: c, as_of: form.as_of.value, opened: form.opened.value || null }, 'user');
-      if (commit(next, 'Versements enregistrés.')) close();
-    });
-  }
-
-  return { openTickers, openLine, openAccount };
+  return { openTickers, openLine };
 }

@@ -74,17 +74,6 @@ export function evaluateConstraints(rows, portfolio, config) {
   const total = totals(rows).value;
   return (config.constraints ?? []).map((c) => {
     const out = { id: c.id, label: c.label, type: c.type, base };
-    if (c.type === 'contribution_ceiling') {
-      const acct = (portfolio.accounts ?? []).find((a) => a.envelope === c.envelope);
-      if (!acct || acct.contributions === undefined) return { ...out, envelope: c.envelope, state: 'missing', ratio: 0, note: `Versements de « ${c.envelope} » non renseignés (portfolio.accounts).` };
-      const ratio = acct.contributions / c.ceiling;
-      const envValue = rows.filter((r) => r.h.envelope === c.envelope).reduce((a, r) => a + (r.value_base ?? 0), 0);
-      return {
-        ...out, envelope: c.envelope, ratio, value: acct.contributions, limit: c.ceiling, remaining: c.ceiling - acct.contributions,
-        as_of: acct.as_of, envelope_value: envValue,
-        state: ratio > 1 ? 'breach' : ratio >= (c.warn_ratio ?? 0.9) ? 'warn' : 'ok',
-      };
-    }
     if (c.type === 'share_cap') {
       const groups = groupBy(rows, GROUP_KEY[c.group_by]);
       const share = groups.filter((g) => c.keys.includes(g.key)).reduce((a, g) => a + g.share, 0);
@@ -134,7 +123,6 @@ export function reviewItems(rows, constraints, config, fmt) {
     if (c.state === 'ok') continue;
     const sev = c.state === 'breach' ? 3 : 2;
     let detail = c.note ?? '';
-    if (c.type === 'contribution_ceiling' && c.state !== 'missing') detail = `${fmt.pct(c.ratio, { signed: false })} du plafond versé, reste ${fmt.money(c.remaining, base, { digits: 0 })}`;
     if (c.type === 'share_cap') detail = c.state === 'breach'
       ? `${fmt.pct(c.share, { signed: false })} > plafond ${fmt.pct(c.max, { signed: false })}`
       : `${fmt.pct(c.share, { signed: false })} < minimum ${fmt.pct(c.min, { signed: false })}`;

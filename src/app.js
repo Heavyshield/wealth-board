@@ -10,6 +10,7 @@ import { renderReview, renderConstraints } from './review.js';
 import * as prices from './prices.js';
 import { initImport } from './import-ui.js';
 import { createEditors } from './editors.js';
+import { initDataUI } from './data-ui.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -80,9 +81,10 @@ function render() {
   app.rows = rows;
   const constraints = evaluateConstraints(rows, portfolio, config);
   renderReview($('#review'), reviewItems(rows, constraints, config, fmt), { onSelect: focusTarget });
-  renderConstraints($('#constraints'), constraints, { onEditAccount: (env) => app.editors.openAccount(env) });
+  renderConstraints($('#constraints'), constraints);
   $('#sample-banner').hidden = !portfolio.sample_data;
-  $('#rev').textContent = `portfolio rév. ${portfolio.revision}${data.hasWorking('portfolio') ? ' · copie locale' : ''}`;
+  $('#rev').textContent = `rév. ${portfolio.revision}`;
+  app.dataUI?.updateBadge();
   viz.renderKpis($('#summary'), rows, config, app.files.history);
   renderCharts();
   app.table.setData(rows, config, now);
@@ -135,12 +137,18 @@ async function refreshPrices(force) {
   }
 }
 
+/** Save a file locally (working copy, marked unsent) and let the sync layer send it. */
+function saveLocal(file, next) {
+  data.saveWorking(file, next, app.source[file].revision, { dirty: true });
+  app.files[file] = next;
+  app.dataUI?.afterLocalSave(file);
+}
+
 /** Validate + save a new portfolio from any editor. Returns true on success. */
 function commitPortfolio(next, message, { refreshPrices: refresh = false } = {}) {
   const errs = data.validateAll({ ...app.files, portfolio: next }, app.schemas);
   if (errs.portfolio) { toast(`Refusé : ${errs.portfolio[0].path} : ${errs.portfolio[0].message}`, 'error'); return false; }
-  data.saveWorking('portfolio', next, app.source.portfolio.revision);
-  app.files.portfolio = next;
+  saveLocal('portfolio', next);
   render();
   toast(`${message} (rév. ${next.revision})`);
   if (refresh) refreshPrices(false);
@@ -150,14 +158,13 @@ function commitPortfolio(next, message, { refreshPrices: refresh = false } = {})
 function removeSample() {
   const sample = app.source.portfolio;
   const n = app.files.portfolio.holdings.filter((h) => sample.holdings.some((s) => s.id === h.id)).length;
-  const msg = `Retirer les ${n} lignes d'exemple, les versements d'exemple et l'historique d'exemple ?\n`
+  const msg = `Retirer les ${n} lignes d'exemple et l'historique d'exemple ?\n`
     + 'Vos lignes importées ou ajoutées sont gardées. Le budget, les cibles et les règles (config.json) restent à ajuster.';
   if (!confirm(msg)) return;
   if (!commitPortfolio(data.removeSampleData(app.files.portfolio, sample, 'user'), `${n} lignes d'exemple retirées`)) return;
   if (app.files.history.sample_data) {
     const h = { ...structuredClone(app.files.history), sample_data: false, snapshots: [], revision: app.files.history.revision + 1, updated_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z') };
-    data.saveWorking('history', h, app.source.history.revision);
-    app.files.history = h;
+    saveLocal('history', h);
     render();
   }
 }
@@ -166,8 +173,7 @@ function persistPrices() {
   const next = prices.persistPrices(app.files.portfolio, app.merged, 'user');
   const errs = data.validateAll({ ...app.files, portfolio: next }, app.schemas);
   if (errs.portfolio) { toast(`Refusé : ${errs.portfolio[0].path} : ${errs.portfolio[0].message}`, 'error'); return; }
-  data.saveWorking('portfolio', next, app.source.portfolio.revision);
-  app.files.portfolio = next;
+  saveLocal('portfolio', next);
   render();
   toast(`Cours mémorisés dans la copie locale (rév. ${next.revision}).`);
 }
@@ -220,8 +226,7 @@ function onEdits(kind, edits) {
     toast(`Modification refusée : ${e.path} : ${e.message}.${hint}`, 'error');
     return;
   }
-  data.saveWorking('portfolio', next, app.source.portfolio.revision);
-  app.files.portfolio = next;
+  saveLocal('portfolio', next);
   app.table.clearEdits();
   render();
   toast(`Enregistré dans la copie locale (rév. ${next.revision}). Exportez pour mettre à jour le fichier.`);
@@ -271,6 +276,7 @@ async function main() {
       })));
     if (unknown.length) showErrors({ config: unknown });
     initSettings();
+    app.dataUI = initDataUI({ app, render, toast, dialog: $('#data'), conflictDialog: $('#conflict'), badge: $('#sync-badge'), openButton: $('#open-data') });
     app.editors = createEditors({ dialog: $('#editor'), getState: () => ({ portfolio: app.files.portfolio, config: app.files.config }), commit: commitPortfolio });
     $('#remove-sample').addEventListener('click', removeSample);
     initImport({
@@ -280,8 +286,7 @@ async function main() {
       onApply: (next, n) => {
         const errs = data.validateAll({ ...app.files, portfolio: next }, app.schemas);
         if (errs.portfolio) { toast(`Import refusé : ${errs.portfolio[0].path} : ${errs.portfolio[0].message}`, 'error'); return false; }
-        data.saveWorking('portfolio', next, app.source.portfolio.revision);
-        app.files.portfolio = next;
+        saveLocal('portfolio', next);
         render();
         toast(`Import appliqué (rév. ${next.revision}) : ${n.added} ajout(s), ${n.changed} modification(s), ${n.removed} suppression(s). Voir le journal.`);
         if (n.added) refreshPrices(false);
@@ -296,12 +301,6 @@ async function main() {
     console.error(e);
   }
 
-  $('#export').addEventListener('click', () => data.downloadJson('portfolio', app.files.portfolio));
-  $('#reset-local').addEventListener('click', () => {
-    if (!confirm('Supprimer la copie locale et recharger les fichiers ? Les modifications non exportées seront perdues.')) return;
-    data.FILES.forEach(data.dropWorking);
-    location.reload();
-  });
 }
 
 main();

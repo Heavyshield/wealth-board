@@ -78,7 +78,6 @@ Le champ `ticker` d'une ligne sert pour toutes les sources (format Yahoo : `TTE.
 - **+ Ajouter une ligne** (au-dessus du tableau) : actions, ETF, fonds, livrets, comptes en devise, espèces, métaux
   (poids, unité, pureté : valorisés au poids fin × cours spot).
 - **✎** à côté d'un nom : modifier tous les champs ou **supprimer** la ligne (elle reste dans le journal).
-- **Modifier les versements** (carte « Plafond de versements PEA ») : total versé, date, ouverture.
 - **Retirer les données d'exemple** (bandeau jaune) : enlève les lignes et l'historique fictifs, garde vos lignes.
   Pensez ensuite à ajuster budget, cibles et règles dans `config.json`.
 
@@ -91,5 +90,37 @@ Le fichier est lu dans le navigateur, rien n'est envoyé. Si une colonne n'est p
 les en-têtes trouvés : ajoutez le nom exact dans `config.json → imports.boursorama.columns`.
 Les nouvelles lignes n'ont pas de ticker : ajoutez-le (format Yahoo, ex. `TTE.PA`) pour le cours en direct.
 
-## Configuration Google Drive
-À venir (étape f).
+## Sauvegarde et synchronisation (bouton « Données »)
+Le badge à côté du titre indique où sont vos données : « Navigateur seulement · non sauvegardé »,
+« Drive ✓ 10:42 », « Drive · 1 non envoyé(s) », « Drive · reconnecter »…
+- **Google Drive** (recommandé, marche aussi sur téléphone) : un dossier « Wealth Board » avec `portfolio.json`,
+  `config.json`, `history.json`. Chaque modification est envoyée automatiquement. Si un fichier a changé sur Drive
+  entre-temps (Claude, autre appareil), l'application **demande** : garder la mienne / garder celle de Drive /
+  voir les différences. Rien n'est écrasé en silence.
+- **Dossier local** (Chrome / Edge sur ordinateur) : par exemple un dossier synchronisé par Google Drive pour ordinateur.
+- **Fichiers JSON** : exporter / importer chaque fichier, toujours disponible.
+
+### Configurer Google Drive (15 minutes, une seule fois)
+L'application utilise le droit minimal `drive.file` : elle ne voit **que les fichiers qu'elle crée**, rien d'autre
+de votre Drive. Le « client ID » n'est pas un secret (il est limité aux adresses autorisées) : il va dans `config.json`.
+1. Aller sur https://console.cloud.google.com/ (compte Google qui a le Drive) → en haut **Sélectionner un projet** →
+   **Nouveau projet** → nom `wealth-board` → **Créer**, puis sélectionner ce projet.
+2. Menu ☰ → **API et services** → **Bibliothèque** → chercher **Google Drive API** → **Activer**.
+3. Menu → **API et services** → **Écran de consentement OAuth** (ou « Google Auth Platform ») → **Commencer** :
+   nom de l'application `Wealth Board`, e-mail d'assistance = le vôtre → type d'audience **Externe** →
+   coordonnées = votre e-mail → accepter → **Créer**.
+4. **Audience** (ou « Utilisateurs test ») → **Ajouter des utilisateurs** → votre adresse Gmail → **Enregistrer**.
+   (L'application reste « En test » : seul vous pouvez vous connecter. C'est voulu.)
+5. **Clients** (ou **Identifiants** → **Créer des identifiants** → **ID client OAuth**) → type **Application Web** →
+   nom `wealth-board web` → **Origines JavaScript autorisées**, ajouter :
+   - `https://heavyshield.github.io`
+   - `http://localhost:8770`
+   (pas d'« URI de redirection » nécessaire) → **Créer**.
+6. Copier l'**ID client** (se termine par `.apps.googleusercontent.com`) dans `data/config.json` :
+   `"drive": { "client_id": "…apps.googleusercontent.com", "folder_name": "Wealth Board" }`, puis commit + push.
+7. Sur le site : **Données** → **Connecter Google Drive** → choisir votre compte → autoriser.
+   Au premier branchement, vos données de ce navigateur sont envoyées dans le dossier « Wealth Board ».
+   Sur un autre appareil (téléphone), le même bouton retrouve le dossier et charge vos données.
+Une connexion Google dure environ une heure ; ensuite le badge affiche « reconnecter » (un clic).
+Google peut afficher « Google n'a pas validé cette application » : c'est votre propre application en mode test,
+cliquez **Continuer**.

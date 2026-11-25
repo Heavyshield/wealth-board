@@ -299,25 +299,12 @@
           },
           "type": {
             "enum": [
-              "contribution_ceiling",
               "share_cap",
               "runway"
             ]
           },
           "label": {
             "type": "string"
-          },
-          "envelope": {
-            "type": "string"
-          },
-          "ceiling": {
-            "type": "number",
-            "exclusiveMinimum": 0
-          },
-          "warn_ratio": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 1
           },
           "group_by": {
             "enum": [
@@ -502,6 +489,19 @@
           "etf_name_pattern": {
             "type": "string"
           }
+        }
+      }
+    },
+    "drive": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "description": "Google OAuth client ID (public, restricted by authorized origins)"
+        },
+        "folder_name": {
+          "type": "string"
         }
       }
     }

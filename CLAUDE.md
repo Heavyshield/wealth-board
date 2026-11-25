@@ -11,8 +11,8 @@ Footer must always read: "Outil de suivi, pas un conseil en investissement."
 - [x] (d) price providers: FX (Frankfurter > ECB), metals (gold-api), quotes (own Yahoo proxy), cache, fallback
 - [x] (e) CSV position import (Boursorama profile) with column mapping, diff preview, per-line apply
 - [x] (e+) editing: ticker assistant (ISIN -> Yahoo via proxy /search), line editor (add/edit/delete any class),
-  PEA contributions editor, "Retirer les données d'exemple"
-- [ ] (f) Google Drive sync (GIS, drive.file) + File System Access fallback + conflicts
+"Retirer les données d'exemple"
+- [x] (f) Google Drive sync (GIS token, drive.file) + local folder (File System Access) + JSON import/export, conflicts asked
 - [ ] (g) "Export for Claude" + snapshot button
 
 ## Layout
@@ -33,7 +33,11 @@ tools/yahoo-proxy-worker.js  Cloudflare Worker the user deploys (Yahoo has no CO
 tests/prices.test.js + tests/fixtures/*.json  real API responses captured 2026-11-25
 src/csv.js          tolerant CSV: UTF-8/BOM or Windows-1252, ; , tab, RFC 4180 quotes, FR/EN numbers
 src/importer.js     column mapping via config.imports, diff vs one envelope, applyImport (changelog per change)
-src/editors.js      dialogs: ticker assistant, line editor, account (contributions) editor -- all via data.js
+src/editors.js      dialogs: ticker assistant, line editor -- all via data.js
+src/drive.js        GIS token (drive.file, memory only) + Drive REST client (ensureFolder, listFiles, get/update/create)
+src/sync.js         pure sync rules (pull / push / conflict) + summarizeDiff; tests/sync.test.js runs it on a fake Drive
+src/folder.js       File System Access fallback (handle in IndexedDB)
+src/data-ui.js      "Données" dialog, header sync badge, conflict dialog (keep mine / keep Drive's / see diff)
 src/import-ui.js    "Importer CSV" dialog: format, envelope, file -> mapping + diff with checkboxes -> apply
 tests/import.test.js + tests/fixtures/boursorama-fake-*.csv  FAKE exports (EN/FR headers, cp1252, missing column)
 src/format.js       fr-FR formatting + parsing of typed numbers
@@ -57,8 +61,8 @@ to detect that a file changed under a local copy and asks the user instead of ov
   `currency`, `price_source`, `manual_price?` `{value, as_of, currency?, source?}`,
   `last_price?` (last known market price; optional `prev_close` enables the day change), `metal?` `{code, weight, unit: g|oz|kg, purity 0..1}`,
   `tags[]`, `notes`, `metrics?` `{per, pcf, net_debt_ebitda, as_of}`, `updated_at`.
-- `accounts[]` (optional): `{ envelope, contributions?, opened?, as_of, notes? }` -- facts per envelope,
-  e.g. total PEA contributions (not the value) for the ceiling widget.
+- `accounts[]`: legacy (PEA ceiling widget removed 2026-11-25 at the user's request: PEA is full). Still accepted by
+  the schema so old local copies load; ignored. Do not reintroduce a ceiling tracker unless asked.
 - `metrics` may hold any numeric metric (`per`, `pcf`, `net_debt_ebitda`, `dividend_yield`...) + required `as_of`
   (date of the financial data, never invented) + optional `source`.
 - `changelog[]`: `{ date, file, target, field, old, new, author: "user"|"claude", note? }`.
@@ -76,7 +80,6 @@ to detect that a file changed under a local copy and asks the user instead of ov
   `require_positive`: a value <= 0 fails (loss-making PER). Missing metric -> "À compléter", never a pass.
   Line status, worst wins: breach > incomplete > stale (metrics older than metrics_max_age_days) > ok; `na` = no rule applies.
 - Constraint types:
-  - `contribution_ceiling` `{envelope, ceiling, warn_ratio?}` -> reads `portfolio.accounts[envelope].contributions`.
   - `share_cap` `{group_by, keys[], max?, min?}` -> share of total value; breach above max, warn below min.
   - `runway` `{monthly_budget, target_months, liquid: scope}` -> months = liquid value / budget; warn < target, breach < half.
 - "À revoir" = rule breaches, missing/stale metrics, missing/stale prices, missing FX, constraints not OK,
@@ -115,8 +118,8 @@ to detect that a file changed under a local copy and asks the user instead of ov
   Add a changelog entry (`author: "claude"`), bump `revision` and `updated_at`.
 - **Add an asset class / envelope**: add to `config.asset_classes` / `config.envelopes` (pick `pricing`).
 - **Add a rule**: append to `config.rules.items` (any metric name); add that metric + `as_of` to the holdings' `metrics`.
-- **Edit data in the UI**: ✎ on a row (line editor), "+ Ajouter une ligne", "Modifier les versements" on the PEA card,
-  "N ligne(s) sans ticker · Compléter" in the price line. data.js: addHolding / removeHolding / setAccount /
+- **Edit data in the UI**: ✎ on a row (line editor), "+ Ajouter une ligne",
+  "N ligne(s) sans ticker · Compléter" in the price line. data.js: addHolding / removeHolding /
   removeSampleData / applyEdits (dotted paths, objects compared by value, null removes a field).
 - **Import a new CSV format** (other broker): add a profile to `config.imports` (`columns` aliases per field,
   `required`, `update_fields`, `envelope_default`); test with a FAKE file in tests/fixtures (only CSVs allowed there).
@@ -140,6 +143,23 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - UI prefs (theme, columns) in localStorage `wb.ui.*`; data working copy in `wb.working.<file>`.
 - Must be served over http(s) (file:// blocks module/JSON loading; the page says so).
 - Local dev: `python -m http.server 8770` in the repo, open http://localhost:8770/ and /tests/.
+
+## Persistence and sync (src/sync.js, src/data-ui.js)
+- Source of the user's data, `localStorage wb.source`: `repo` (sample defaults) | `drive` | `folder`.
+  The local working copy (`wb.working.<file>` = { data, dirty, drive_version, base_revision }) is the instant /
+  offline cache; Drive is the shared master. Every save goes through app.js `saveLocal()` -> dirty -> pushed.
+- Drive: folder "Wealth Board" (appProperties wealthboard=folder) created by the app; files portfolio.json /
+  config.json / history.json, pretty-printed. Scope drive.file: the app sees ONLY files it created, so
+  **Claude must edit these files in place** (same file id) through a Drive connector -- a new file with the same
+  name is invisible to the app. Change detection uses Drive's `version` (catches edits that forget `revision`),
+  but always bump `revision` + changelog anyway.
+- Rules: clean+unchanged = nothing; clean+changed = pull; dirty+unchanged = push; dirty+changed = ask;
+  invalid JSON/schema on Drive = ask, never overwrite silently. A legacy local record without `dirty` counts as dirty.
+- Pull on tab focus when a token is valid; token ~1 h, then the badge says "reconnecter" (GIS needs a click).
+- OAuth client ID: `config.drive.client_id` (public by design, restricted to authorized JS origins
+  https://heavyshield.github.io and http://localhost:8770). Setup steps in README.
+- Not verified yet (needs the user's client ID): the real Google sign-in and Drive calls. Verified: sync logic on a
+  fake Drive (7 scenarios), GIS script loads, UI flows, JSON import/export.
 
 ## CSV import (src/importer.js)
 - Real Boursorama export format is not publicly documented (checked 2026-11-25): "Positions" tab -> "Exporter en CSV",

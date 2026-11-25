@@ -3,7 +3,7 @@
 
 import worker from '../tools/yahoo-proxy-worker.js';
 import { parseSearch, bestListing, searchIsins } from '../src/providers/yahoo-proxy.js';
-import { addHolding, removeHolding, setAccount, removeSampleData, applyEdits } from '../src/data.js';
+import { addHolding, removeHolding, removeSampleData, applyEdits } from '../src/data.js';
 
 const fx = async (name) => (await fetch(`./fixtures/${name}`, { cache: 'no-store' })).json();
 const res = (status, body) => ({ status, ok: status < 400, json: async () => body });
@@ -56,21 +56,12 @@ export async function editingTests({ test, assert, eq, files, schemas, validate,
     assert(!('manual_price' in unset.holdings.find((h) => h.id === 'pea-etf-monde')), 'null = champ retiré');
   });
 
-  await test('Versements PEA : création, mise à jour, journal', () => {
-    const next = setAccount(files.portfolio, 'pea', { contributions: 61000, as_of: '2026-11-25' }, 'user', NOW);
-    eq(next.accounts.find((a) => a.envelope === 'pea').contributions, 61000, 'montant');
-    eq(next.changelog.at(-1).target, 'account:pea', 'cible');
-    const cto = setAccount(files.portfolio, 'cto', { contributions: 5000, as_of: '2026-11-25' }, 'user', NOW);
-    eq(cto.accounts.length, (files.portfolio.accounts?.length ?? 0) + 1, 'nouveau compte');
-    assert(validate(schemas.portfolio, cto).length === 0, 'valide');
-  });
-
   await test('Retirer les données d’exemple : garde les lignes réelles, une entrée de journal', () => {
     const real = { id: 'pea-vraie-ligne', name: 'Vraie ligne', envelope: 'pea', asset_class: 'equity', isin: 'FR0000121014', quantity: 3, unit_cost: 600, currency: 'EUR', price_source: 'quote', tags: [], notes: '' };
     const mixed = addHolding(files.portfolio, real, 'user', NOW);
     const clean = removeSampleData(mixed, files.portfolio, 'user', NOW);
     eq(clean.holdings.map((h) => h.id).join(), 'pea-vraie-ligne', 'seule la ligne réelle reste');
-    eq(clean.sample_data, false, 'drapeau retiré'); eq((clean.accounts ?? []).length, 0, 'versements d’exemple retirés');
+    eq(clean.sample_data, false, 'drapeau retiré'); 
     eq(clean.changelog.at(-1).old.length, files.portfolio.holdings.length, 'ids retirés listés');
     assert(validate(schemas.portfolio, clean).length === 0, 'valide');
   });

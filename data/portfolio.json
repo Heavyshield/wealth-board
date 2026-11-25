@@ -35,15 +35,6 @@
       }
     }
   },
-  "accounts": [
-    {
-      "envelope": "pea",
-      "contributions": 23400,
-      "opened": "2019-03-15",
-      "as_of": "2026-11-01",
-      "notes": "Total des versements (pas la valeur)."
-    }
-  ],
   "holdings": [
     {
       "id": "pea-exemple-industries",

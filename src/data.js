@@ -46,9 +46,8 @@ export function crossCheck(portfolio, config) {
   (config.rules?.items ?? []).forEach((r, i) => scopeErrs(r.applies_to, `config.rules.items[${i}] (${r.id})`));
   (config.constraints ?? []).forEach((c, i) => {
     const at = `config.constraints[${i}] (${c.id})`;
-    const need = { contribution_ceiling: ['envelope', 'ceiling'], share_cap: ['group_by', 'keys'], runway: ['monthly_budget', 'target_months'] }[c.type] ?? [];
+    const need = { share_cap: ['group_by', 'keys'], runway: ['monthly_budget', 'target_months'] }[c.type] ?? [];
     for (const k of need) if (c[k] === undefined) errors.push({ path: at, message: `champ « ${k} » obligatoire pour le type ${c.type}` });
-    if (c.envelope && !envelopes.has(c.envelope)) errors.push({ path: at, message: `enveloppe « ${c.envelope} » inconnue` });
     scopeErrs(c.liquid, at);
   });
   for (const [id, p] of Object.entries(config.imports ?? {})) {
@@ -86,32 +85,52 @@ export function validateAll(files, schemas) {
   return out;
 }
 
+/** Where the user's data lives: 'repo' (sample, default), 'drive' or 'folder'. */
+export const getSource = () => localStorage.getItem('wb.source') ?? 'repo';
+export const setSource = (s) => localStorage.setItem('wb.source', s);
+
 /**
- * Load files from ./data, then reconcile with the localStorage working copy.
- * Returns { files, conflicts: [{ file, mine, theirs }] }.
- * A conflict means the source file changed (higher revision) since the working copy
- * was based on it: the UI must ask, never pick silently.
+ * Load files from ./data, then overlay the localStorage working copy.
+ * Returns { files, source, conflicts: [{ file, mine, theirs }] }.
+ * In 'repo' mode a conflict means the repo file changed (higher revision) since the working copy was
+ * based on it: the UI asks. In 'drive' / 'folder' mode the repo files are only defaults for files that
+ * have no local copy yet; Drive conflicts are handled by sync.js.
  */
 export async function loadAll(base = '.') {
   const source = Object.fromEntries(await Promise.all(FILES.map(async (f) => [f, await fetchJson(`${base}/data/${f}.json`)])));
   const files = {};
   const conflicts = [];
+  const mode = getSource();
   for (const f of FILES) {
     const working = readWorking(f);
     if (!working) { files[f] = source[f]; continue; }
-    if (working.base_revision === source[f].revision) files[f] = working.data;
-    else { files[f] = working.data; conflicts.push({ file: f, mine: working.data, theirs: source[f] }); }
+    files[f] = working.data;
+    if (mode === 'repo' && working.base_revision !== source[f].revision && working.base_revision !== undefined) {
+      conflicts.push({ file: f, mine: working.data, theirs: source[f] });
+    }
   }
   return { files, source, conflicts };
 }
 
-function readWorking(file) {
+/** Raw working-copy record { data, base_revision, saved_at, dirty, drive_version } or null. */
+export function readWorking(file) {
   try { return JSON.parse(localStorage.getItem(WORKING_KEY(file))); } catch { return null; }
 }
 
-/** Persist a working copy. `baseRevision` = revision of the source file it derives from. */
-export function saveWorking(file, data, baseRevision) {
-  localStorage.setItem(WORKING_KEY(file), JSON.stringify({ base_revision: baseRevision, saved_at: new Date().toISOString(), data }));
+/**
+ * Persist a working copy. `baseRevision` = revision of the repo file it derives from (repo mode).
+ * extra.dirty (default true: a local edit not yet sent anywhere), extra.drive_version (kept from the
+ * previous record when not given).
+ */
+export function saveWorking(file, data, baseRevision, extra = {}) {
+  const prev = readWorking(file) ?? {};
+  localStorage.setItem(WORKING_KEY(file), JSON.stringify({
+    base_revision: baseRevision ?? prev.base_revision,
+    saved_at: new Date().toISOString(),
+    dirty: extra.dirty ?? true,
+    drive_version: extra.drive_version ?? prev.drive_version,
+    data,
+  }));
 }
 
 export function dropWorking(file) { localStorage.removeItem(WORKING_KEY(file)); }
@@ -177,21 +196,6 @@ export function removeHolding(portfolio, id, author = 'user', now = new Date()) 
   return bump(next, portfolio, date);
 }
 
-/** Create or update the facts of one envelope (portfolio.accounts). Returns a NEW portfolio. */
-export function setAccount(portfolio, envelope, fields, author = 'user', now = new Date()) {
-  const date = stamp(now);
-  const next = structuredClone(portfolio);
-  next.accounts ??= [];
-  let acct = next.accounts.find((a) => a.envelope === envelope);
-  if (!acct) { acct = { envelope, as_of: fields.as_of ?? date.slice(0, 10) }; next.accounts.push(acct); }
-  for (const [k, v] of Object.entries(fields)) {
-    if (JSON.stringify(acct[k] ?? null) === JSON.stringify(v ?? null)) continue;
-    next.changelog.push({ date, file: 'portfolio', target: `account:${envelope}`, field: k, old: acct[k] ?? null, new: v ?? null, author });
-    if (v === null || v === undefined) delete acct[k]; else acct[k] = v;
-  }
-  return bump(next, portfolio, date);
-}
-
 /**
  * Remove the sample lines shipped in the repo (ids of `sample.holdings`) and sample account facts,
  * mark the file as real data. One changelog entry listing what was removed. Returns a NEW portfolio.
@@ -202,12 +206,11 @@ export function removeSampleData(portfolio, sample, author = 'user', now = new D
   const next = structuredClone(portfolio);
   const removed = next.holdings.filter((h) => ids.has(h.id)).map((h) => h.id);
   next.holdings = next.holdings.filter((h) => !ids.has(h.id));
-  const sampleAccts = new Set((sample.accounts ?? []).map((a) => JSON.stringify(a)));
-  const acctRemoved = (next.accounts ?? []).filter((a) => sampleAccts.has(JSON.stringify(a))).map((a) => a.envelope);
-  next.accounts = (next.accounts ?? []).filter((a) => !sampleAccts.has(JSON.stringify(a)));
+  const hadAccounts = Boolean(next.accounts);
+  delete next.accounts; // legacy (PEA ceiling widget removed)
   next.sample_data = false;
   next.changelog.push({ date, file: 'portfolio', target: 'sample', field: 'holdings', old: removed, new: null, author,
-    note: `données d'exemple retirées (${removed.length} lignes${acctRemoved.length ? `, versements ${acctRemoved.join(', ')}` : ''})` });
+    note: `données d'exemple retirées (${removed.length} lignes${hadAccounts ? ', ancien bloc accounts' : ''})` });
   return bump(next, portfolio, date);
 }
 

@@ -206,14 +206,6 @@
   },
   "constraints": [
     {
-      "id": "pea-ceiling",
-      "type": "contribution_ceiling",
-      "label": "Plafond de versements PEA",
-      "envelope": "pea",
-      "ceiling": 150000,
-      "warn_ratio": 0.9
-    },
-    {
       "id": "metals-pocket",
       "type": "share_cap",
       "label": "Poche métaux précieux",
@@ -334,5 +326,9 @@
       "asset_class_default": "equity",
       "etf_name_pattern": "(^|[^A-Z])(ETF|UCITS|TRACKER|MSCI|STOXX|NASDAQ)([^A-Z]|$)"
     }
+  },
+  "drive": {
+    "client_id": "",
+    "folder_name": "Wealth Board"
   }
 }
