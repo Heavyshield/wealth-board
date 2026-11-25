@@ -149,13 +149,13 @@ const st = (id) => rows.find((r) => r.id === id).rules.status;
 
 await test('Règles : statuts attendus sur les données d’exemple', () => {
   eq(st('pea-exemple-industries'), 'ok', 'PER 18, P/CF 11, DN/EBITDA 1,2');
-  eq(st('pea-demo-energie'), 'breach', 'PER 31 > 25 et DN/EBITDA 3,1 > 2,5');
+  eq(st('pea-demo-energie'), 'danger', 'PER 31 > 28 : zone dangereuse (et DN/EBITDA 3,1 > 2,5)');
   eq(st('cto-fjord-exempel'), 'unknown', 'aucun ratio : n/d, pas d’alerte');
   eq(st('cto-sample-corp'), 'breach', 'P/CF 16,5 > 15');
   eq(st('pea-etf-monde'), 'na', 'ETF hors périmètre');
   eq(st('livret-a'), 'na', 'livret hors périmètre');
   const demo = rows.find((r) => r.id === 'pea-demo-energie').rules.results;
-  eq(demo.filter((x) => x.state === 'fail').map((x) => x.rule.id).join(','), 'per-max,leverage-max', 'règles enfreintes');
+  eq(demo.filter((x) => x.state === 'fail').map((x) => x.rule.id).join(','), 'per-max,per-danger,leverage-max', 'règles enfreintes');
 });
 
 await test('Règles : PER négatif = hors règles, dette nette négative = conforme', () => {
@@ -208,7 +208,9 @@ await test('À revoir : critiques d’abord, triés par montant', () => {
   const crit = items.filter((i) => i.severity === 3).map((i) => i.title);
   const warn = items.filter((i) => i.severity === 2).map((i) => i.title);
   assert(crit.includes('Poche métaux précieux'), 'contrainte métaux');
-  assert(warn.includes('Démo Énergie (fictif)') && warn.includes('Sample Corp (fictive)'), 'seuils dépassés = avertissement');
+  assert(crit.includes('Démo Énergie (fictif)'), 'PER > 28 = zone dangereuse, en tête');
+  assert(warn.includes('Sample Corp (fictive)'), 'seuil dépassé (P/CF) = avertissement');
+  assert(items.find((i) => i.title === 'Démo Énergie (fictif)' && i.kind === 'zone dangereuse').detail.includes('réduction progressive'), 'libellé');
   assert(!items.some((i) => i.title === 'Fjord Exempel AB (fictif)' && i.kind !== 'prix'), 'ratios n/d : aucune alerte');
 });
 

@@ -211,7 +211,7 @@ export function removeSampleData(portfolio, sample, author = 'user', now = new D
 // ---------------------------------------------------------------- merge pasted lines (Éditeur Données)
 /**
  * Merge a pasted fragment into the files. Fragment = { holdings?: [...], envelopes?: [...], asset_classes?: [...],
- *   remove?: [holding ids] }
+ *   rules?: [config.rules.items], remove?: [holding ids] }
  * (or a bare array of holdings). Items are matched by `id`: new ones are added, existing ones updated field by
  * field. Every change is logged (author). Returns { files: NEW {portfolio, config, history}, added, updated, unchanged, problems }.
  * Lines must carry `as_of` (date the amount is known); missing -> problem, line skipped.
@@ -231,6 +231,14 @@ export function mergeFragment(files, fragment, author = 'user', now = new Date()
       if (i < 0) { config[kind].push(item); log('config', `${kind}:${item.id}`, kind, null, 'ajout'); out.added.push(`${kind}:${item.id}`); configChanged = true; }
       else if (JSON.stringify(config[kind][i]) !== JSON.stringify(item)) { log('config', `${kind}:${item.id}`, kind, config[kind][i], item); config[kind][i] = item; out.updated.push(`${kind}:${item.id}`); configChanged = true; }
     }
+  }
+  for (const rule of frag.rules ?? []) {
+    if (!rule?.id) { out.problems.push('règle sans id'); continue; }
+    config.rules ??= { items: [] };
+    const items = config.rules.items;
+    const i = items.findIndex((x) => x.id === rule.id);
+    if (i < 0) { items.push(rule); log('config', `rules:${rule.id}`, 'rule', null, 'ajout'); out.added.push(`rules:${rule.id}`); configChanged = true; }
+    else if (JSON.stringify(items[i]) !== JSON.stringify(rule)) { log('config', `rules:${rule.id}`, 'rule', items[i], rule); items[i] = rule; out.updated.push(`rules:${rule.id}`); configChanged = true; }
   }
   for (const line of frag.holdings ?? []) {
     if (!line?.id) { out.problems.push(`ligne sans id : ${JSON.stringify(line).slice(0, 80)}`); continue; }

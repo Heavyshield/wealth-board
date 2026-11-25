@@ -24,6 +24,7 @@ export const RULE_STATUS = {
   partial: { label: 'Partiel', severity: 0 },
   unknown: { label: 'Ratios n/d', severity: -1 },
   breach: { label: 'Au-dessus d\u2019un seuil', severity: 2 },
+  danger: { label: 'Zone dangereuse', severity: 3 },
   na: { label: '—', severity: -1 },
 };
 
@@ -51,7 +52,9 @@ export function evaluateHolding(h, config, now = new Date()) {
   const stale = maxAge !== undefined && ageDays !== null && ageDays > maxAge;
   // A ratio we cannot get (n/d) is not a problem, just less information.
   const known = results.filter((r) => r.state !== 'missing');
-  const status = results.some((r) => r.state === 'fail') ? 'breach'
+  // A failing rule with "severity": "critical" (e.g. PER > 28) = danger zone; any other failing rule = warning.
+  const status = results.some((r) => r.state === 'fail' && r.rule.severity === 'critical') ? 'danger'
+    : results.some((r) => r.state === 'fail') ? 'breach'
     : !known.length ? 'unknown'
     : stale ? 'stale'
     : known.length < results.length ? 'partial' : 'ok';
@@ -116,7 +119,15 @@ export function reviewItems(rows, constraints, config, fmt) {
 
   for (const r of rows) {
     const ev = r.rules;
-    if (ev?.status === 'breach') {
+    if (ev?.status === 'danger') {
+      const crit = ev.results.filter((x) => x.state === 'fail' && x.rule.severity === 'critical');
+      const critMetrics = new Set(crit.map((x) => x.rule.metric));
+      const others = ev.results.filter((x) => x.state === 'fail' && !critMetrics.has(x.rule.metric));
+      const txt = (x) => `${metricText(x)} ${fmt.number(x.value, 2)} (${x.reason ?? `règle ${x.rule.op.replace('<=', '≤').replace('>=', '≥')} ${fmt.number(x.rule.value, 2)}`})`;
+      items.push({ severity: 3, kind: 'zone dangereuse', title: r.h.name,
+        detail: `${crit.map(txt).join(' · ')} : réduction progressive prévue${others.length ? ` · aussi ${others.map(txt).join(' · ')}` : ''}`,
+        amount: r.value_base, target: r.id });
+    } else if (ev?.status === 'breach') {
       const fails = ev.results.filter((x) => x.state === 'fail').map((x) => `${metricText(x)} ${fmt.number(x.value, 2)} (${x.reason ?? `règle ${x.rule.op.replace('<=', '≤').replace('>=', '≥')} ${fmt.number(x.rule.value, 2)}`})`);
       items.push({ severity: 2, kind: 'seuil', title: r.h.name, detail: fails.join(' · ') + (ev.metrics_stale ? ` · métriques de ${ev.metrics_age_days} j` : ''), amount: r.value_base, target: r.id });
     } else if (ev?.status === 'stale') {

@@ -81,7 +81,9 @@ to detect that a file changed under a local copy and asks the user instead of ov
 ## Rules and constraints (src/rules.js) -- JSON only, no code
 - Rule: `{ id, label, metric, op: <=|<|>=|>, value, require_positive?, applies_to? {asset_class[], envelope[], tags_exclude[]}, why? }`.
   `require_positive`: a value <= 0 fails (loss-making PER). Missing metric -> shown "n/d", never counted as a pass, no alert.
-  Line status: breach (a ratio above its threshold: WARNING, severity 2, orange) > unknown (no ratio available)
+  Rule `severity`: "warning" (default) or "critical". Line status: danger (a CRITICAL rule fails, e.g. PER > 28:
+  red ⛔ "Zone dangereuse", severity 3, top of À revoir, "réduction progressive prévue") > breach (a warning rule fails:
+  orange ⚠, severity 2) > unknown (no ratio available)
   > stale (older than metrics_max_age_days, info) > partial (some ratios n/d, the known ones pass) > ok; `na` = no rule.
   A ratio we cannot get is shown "n/d" and raises NO alert (user decision 2026-11-25: less info, not a problem).
   Ratio columns (PER, P/CF, DN/EBITDA) are visible by default (one-time migration wb.ui.ratios_v1).
@@ -172,6 +174,7 @@ to detect that a file changed under a local copy and asks the user instead of ov
    - every line has `as_of` (date the amount is true); unknown amount -> `"quantity": null` (TO_FILL), never guessed;
    - updating a line: `{ "id": "...", "quantity": 1234, "as_of": "YYYY-MM-DD" }` is enough (fields merged);
    - removing a line: `"remove": ["id", ...]` (full line kept in the changelog);
+   - rules: `"rules": [ ...config.rules.items... ]` merged by id (add or change a threshold without editing config by hand);
    - a new kind of asset: add it in `"asset_classes"` (e.g. `preferred`, pricing quote: rules do not apply to it);
    - metals: `asset_class: "metal"`, `metal {code, weight, unit, purity}` per item, quantity = number of items
      (or grams with weight 1 g); purity/weight assumptions written in `notes`;

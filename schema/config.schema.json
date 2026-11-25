@@ -294,6 +294,13 @@
               },
               "why": {
                 "type": "string"
+              },
+              "severity": {
+                "enum": [
+                  "warning",
+                  "critical"
+                ],
+                "description": "critical = danger zone (red, top of À revoir); default warning"
               }
             }
           }

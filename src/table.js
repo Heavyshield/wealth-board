@@ -32,7 +32,7 @@ function ruleBadge(r) {
   if (!ev || ev.status === 'na') return '<span class="sub">—</span>';
   const lines = ev.results.map((x) => `${x.state === 'pass' ? '✓' : x.state === 'fail' ? '⚠' : '·'} ${x.rule.label}${x.value !== null ? ` (${fmt.number(x.value, 2)})` : ' : n/d'}`);
   if (ev.metrics_age_days !== null) lines.push(`Métriques : ${ev.metrics_age_days} j`);
-  const icon = { ok: '✓', breach: '⚠', partial: '✓', unknown: '·', stale: '⏱' }[ev.status];
+  const icon = { ok: '✓', breach: '⚠', danger: '⛔', partial: '✓', unknown: '·', stale: '⏱' }[ev.status];
   return `<span class="rbadge rbadge-${ev.status}" title="${esc(lines.join(' · '))}"><span aria-hidden="true">${icon}</span> ${RULE_STATUS[ev.status].label}</span>`;
 }
 
@@ -70,14 +70,17 @@ function columns(ctx) {
       id: `m_${k}`, path: `metrics.${k}`, label, num: true, edit: 'number', optional: true,
       sort: (r) => r.h.metrics?.[k] ?? -Infinity,
       cell: (r) => {
-        const res = r.rules?.results.find((x) => x.rule.metric === k);
+        // Several rules can watch the same ratio (PER <= 25 warning, PER <= 28 critical): show the worst one.
+        const forMetric = r.rules?.results.filter((x) => x.rule.metric === k) ?? [];
+        const res = forMetric.find((x) => x.state === 'fail' && x.rule.severity === 'critical') ?? forMetric.find((x) => x.state === 'fail') ?? forMetric[0];
         const v = r.h.metrics?.[k];
         if (!res) return v === undefined ? '<span class="sub">—</span>' : fmt.number(v, 2); // no rule on this line (ETF, cash...)
         const src = r.h.metrics ? ` · ${r.h.metrics.source ?? 'saisi'} au ${fmt.date(r.h.metrics.as_of)}` : '';
         if (v === undefined || v === null) return `<span class="sub" title="${esc(`Ratio non disponible : moins d’information, pas d’alerte${r.h.metrics?.notes ? ` (${r.h.metrics.notes})` : ''}`)}">n/d</span>`;
         if (res.state === 'fail') {
           const why = res.reason ?? `seuil ${res.rule.op.replace('<=', '≤').replace('>=', '≥')} ${fmt.number(res.rule.value, 2)}`;
-          return `<span class="ratio-warn" title="${esc(`${label} ${fmt.number(v, 2)} : ${why}${src}`)}"><span aria-hidden="true">⚠ </span>${fmt.number(v, 2)}<span class="sr-only"> (${esc(why)})</span></span>`;
+          const cls = res.rule.severity === 'critical' ? 'ratio-danger' : 'ratio-warn';
+          return `<span class="${cls}" title="${esc(`${label} ${fmt.number(v, 2)} : ${why}${src}`)}"><span aria-hidden="true">${res.rule.severity === 'critical' ? '⛔' : '⚠'} </span>${fmt.number(v, 2)}<span class="sr-only"> (${esc(why)})</span></span>`;
         }
         return `<span title="${esc(`${label} dans le seuil${src}`)}">${fmt.number(v, 2)}</span>`;
       },

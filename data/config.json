@@ -176,6 +176,20 @@
         "why": "Valorisation : prix payé pour 1 € de bénéfice"
       },
       {
+        "id": "per-danger",
+        "label": "PER ≤ 28 (au-delà : zone dangereuse, réduction progressive)",
+        "metric": "per",
+        "op": "<=",
+        "value": 28,
+        "severity": "critical",
+        "applies_to": {
+          "asset_class": [
+            "equity"
+          ]
+        },
+        "why": "Au-delà de 28, la ligne est à réduire progressivement (décision de l'utilisateur)."
+      },
+      {
         "id": "pcf-max",
         "label": "Cours / flux de trésorerie d'exploitation ≤ 15",
         "metric": "pcf",

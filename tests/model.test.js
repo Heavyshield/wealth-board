@@ -2,7 +2,7 @@
 // amount caps, regions by ISIN, and the Éditeur Données merge. Fake lines only (no real data in the repo).
 
 import { valueHoldings, totals, groupBy } from '../src/valuation.js';
-import { evaluateConstraints, reviewItems, evaluateRules } from '../src/rules.js';
+import { evaluateConstraints, reviewItems, evaluateRules, evaluateHolding } from '../src/rules.js';
 import { mergeFragment } from '../src/data.js';
 import * as fmt from '../src/format.js';
 
@@ -59,6 +59,26 @@ export async function modelTests({ test, assert, eq, files, schemas, validate, N
     const c = structuredClone(files.config);
     c.regions.by_isin = { FR0000000001: 'Asie' };
     eq(valueHoldings({ portfolio: files.portfolio, config: c, now: NOW }).find((x) => x.id === 'pea-exemple-industries').region, 'Asie', 'ISIN FR → Asie');
+  });
+
+  await test('PER : ≤ 25 conforme, 25–28 avertissement, > 28 zone dangereuse (seuils de config)', () => {
+    const h = structuredClone(files.portfolio.holdings[0]);
+    const st = (per) => { h.metrics = { per, pcf: 10, net_debt_ebitda: 1, as_of: '2026-11-20' }; return evaluateHolding(h, files.config, NOW).status; };
+    eq(st(24), 'ok', 'PER 24'); eq(st(26), 'breach', 'PER 26'); eq(st(28), 'breach', 'PER 28,0 : pas encore dangereux');
+    eq(st(28.3), 'danger', 'PER 28,3'); eq(st(34), 'danger', 'PER 34');
+    eq(st(-5), 'breach', 'PER négatif = au-dessus du seuil (pas zone dangereuse)');
+    const cfg = structuredClone(files.config); cfg.rules.items.find((r) => r.id === 'per-danger').value = 30;
+    h.metrics.per = 29; eq(evaluateHolding(h, cfg, NOW).status, 'breach', 'seuil modifiable dans le JSON');
+  });
+
+  await test('Éditeur : une règle collée est ajoutée / mise à jour par id', () => {
+    const cfg = structuredClone(files.config); cfg.rules.items = cfg.rules.items.filter((r) => r.id !== 'per-danger');
+    const rule = files.config.rules.items.find((r) => r.id === 'per-danger');
+    const r = mergeFragment({ ...files, config: cfg }, { rules: [rule] }, 'claude', NOW);
+    eq(r.added.join(), 'rules:per-danger', 'ajoutée'); eq(r.files.config.revision, cfg.revision + 1, 'révision config');
+    assert(validate(schemas.config, r.files.config).length === 0, 'config valide');
+    const again = mergeFragment(r.files, { rules: [{ ...rule, value: 30 }] }, 'claude', NOW);
+    eq(again.updated.join(), 'rules:per-danger', 'mise à jour'); eq(again.files.config.rules.items.find((x) => x.id === 'per-danger').value, 30, 'nouveau seuil');
   });
 
   await test('Éditeur : lignes collées ajoutées / mises à jour par id, journalisées', () => {
