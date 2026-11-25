@@ -6,7 +6,7 @@
 // what was last saved.
 
 import * as data from './data.js';
-import { signIn, driveFiles } from './gdrive.js';
+import { signIn, driveFiles, driveFolders } from './gdrive.js';
 
 const META = 'wb.file'; // { name, opened_at, saved_at }
 const when = (iso) => (iso ? new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
@@ -64,7 +64,75 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
   // The user's own wealth-board.json carries its config (often without "drive"): fall back to the site's data/config.json.
   const clientId = () => app.files.config.drive?.client_id || app.source?.config?.drive?.client_id;
   const loggedIn = () => session && Date.now() < session.expires;
-  const files = () => driveFiles(session.token, data.BUNDLE_NAME);
+  // Folder holding wealth-board.json, chosen once per device: { id, path }. Ouvrir / Enregistrer only look there.
+  const FOLDER_KEY = 'wb.drive_folder';
+  const folder = () => JSON.parse(localStorage.getItem(FOLDER_KEY) || 'null');
+  const files = (folderId = folder()?.id ?? null) => driveFiles(session.token, data.BUNDLE_NAME, undefined, folderId);
+
+  /** Folder chooser shown in the Données dialog. Resolves { id, path } (saved for this device) or null (cancelled). */
+  function pickFolder() {
+    return new Promise((resolve) => {
+      const api = driveFolders(session.token);
+      let trail = [{ id: 'root', name: 'Mon Drive' }];
+      let settled = false;
+      const done = (v) => {
+        if (settled) return;
+        settled = true;
+        dialog.removeEventListener('close', onClose);
+        if (v) localStorage.setItem(FOLDER_KEY, JSON.stringify(v));
+        resolve(v);
+      };
+      const onClose = () => done(null);
+      dialog.addEventListener('close', onClose);
+      if (!dialog.open) dialog.showModal();
+
+      async function draw() {
+        const here = trail.at(-1);
+        dialog.innerHTML = `<form method="dialog" class="editor data-dialog"><h2>Dossier Google Drive</h2>
+          <p class="sub-title">Où ranger ${data.BUNDLE_NAME} ? « Ouvrir » et « Enregistrer » utiliseront ce dossier. Choix gardé sur cet appareil (modifiable dans Données).</p>
+          <p><strong>${trail.map((t) => esc(t.name)).join(' / ')}</strong></p>
+          <div class="folder-list"><p><span class="spinner" aria-hidden="true"></span> Chargement…</p></div>
+          <div class="dialog-actions"><button type="button" data-cancel>Annuler</button>
+            <button type="button" data-new>Nouveau dossier ici…</button>
+            <button type="button" class="primary" data-pick>Choisir ce dossier</button></div></form>`;
+        dialog.querySelector('[data-cancel]').addEventListener('click', () => done(null));
+        dialog.querySelector('[data-pick]').addEventListener('click', () => done({ id: here.id, path: trail.map((t) => t.name).join(' / ') }));
+        dialog.querySelector('[data-new]').addEventListener('click', async () => {
+          const name = prompt('Nom du nouveau dossier :', 'Wealth Board')?.trim();
+          if (!name) return;
+          try { const made = await api.create(name, here.id); trail.push({ id: made.id, name: made.name }); draw(); }
+          catch (e) { toast(e.message, 'error'); }
+        });
+        const list = dialog.querySelector('.folder-list');
+        try {
+          const [subs, copies] = await Promise.all([api.children(here.id), files(here.id).list()]);
+          if (settled || trail.at(-1) !== here) return;
+          list.innerHTML = `${copies.length
+            ? `<p class="sub">Contient ${data.BUNDLE_NAME} (modifié le ${when(copies[0].modifiedTime)})${copies.length > 1 ? ` et ${copies.length - 1} autre(s) copie(s)` : ''}.</p>`
+            : `<p class="sub">Pas de ${data.BUNDLE_NAME} ici : il sera créé au premier enregistrement.</p>`}
+            <ul class="folder-items">
+              ${trail.length > 1 ? '<li><button type="button" class="linklike" data-up>↑ Dossier parent</button></li>' : ''}
+              ${subs.map((s) => `<li><button type="button" class="linklike" data-into="${esc(s.id)}" data-name="${esc(s.name)}">📁 ${esc(s.name)}</button></li>`).join('') || '<li class="sub">Aucun sous-dossier.</li>'}
+            </ul>`;
+          list.querySelector('[data-up]')?.addEventListener('click', () => { trail.pop(); draw(); });
+          list.querySelectorAll('[data-into]').forEach((b) => b.addEventListener('click', () => { trail.push({ id: b.dataset.into, name: b.dataset.name }); draw(); }));
+        } catch (e) {
+          list.innerHTML = `<div class="errors"><p>${esc(e.message)}</p></div>`;
+        }
+      }
+
+      // Start where the newest existing wealth-board.json lives, so the user sees where it landed so far.
+      (async () => {
+        try {
+          const [existing] = await files(null).list();
+          if (existing?.parents?.[0]) trail = await api.path(existing.parents[0]);
+        } catch { /* start at My Drive */ }
+        draw();
+      })();
+    });
+  }
+  const ensureFolder = async () => folder() ?? pickFolder();
+
   async function guard(fn) {
     try { await fn(); } catch (e) { toast(e.message, 'error'); if (/expirée/.test(e.message)) session = null; }
     updateBadge(); refresh();
@@ -72,8 +140,10 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
   const login = () => guard(async () => { session = await signIn(clientId()); toast('Connecté à Google Drive.'); });
   // (guard returns a promise: callers await login() then check loggedIn())
   const openDrive = () => guard(async () => {
+    const dir = await ensureFolder();
+    if (!dir) return;
     const all = await files().list();
-    if (!all.length) { toast(`Aucun ${data.BUNDLE_NAME} sur Drive : utilisez « Enregistrer sur Drive » une première fois.`); return; }
+    if (!all.length) { toast(`Aucun ${data.BUNDLE_NAME} dans « ${dir.path} » : enregistrez une première fois, ou changez de dossier (Données).`); return; }
     const [newest, ...older] = all;
     const obj = JSON.parse(await files().read(newest.id));
     const ok = await openObjects([{ name: newest.name, obj }], `Drive (${when(newest.modifiedTime)})`, { drive_id: newest.id, drive_version: newest.version });
@@ -83,9 +153,12 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
     }
   });
   const saveDrive = () => guard(async () => {
+    const dir = await ensureFolder();
+    if (!dir) return;
     const text = data.makeBundle(app.files);
     const m = meta();
     let target = m.drive_id ? await files().meta(m.drive_id).catch(() => null) : null;
+    if (target && !target.parents?.includes(dir.id)) target = null; // opened from another folder: save in the chosen one
     if (!target) target = (await files().list())[0] ?? null;
     if (target && String(target.version) !== String(m.drive_version ?? '')) {
       const who = target.lastModifyingUser?.displayName;
@@ -94,7 +167,7 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
     const saved = target ? await files().update(target.id, text) : await files().create(text);
     for (const f of data.FILES) data.saveWorking(f, app.files[f], app.source[f].revision, { dirty: false });
     setMeta({ saved_at: new Date().toISOString(), drive_id: saved.id, drive_version: saved.version });
-    toast(target ? `${data.BUNDLE_NAME} remplacé sur Drive (version précédente gardée dans l'historique Drive).` : `${data.BUNDLE_NAME} créé sur Drive.`);
+    toast(target ? `${data.BUNDLE_NAME} remplacé dans « ${dir.path} » (version précédente gardée dans l'historique Drive).` : `${data.BUNDLE_NAME} créé dans « ${dir.path} ».`);
   });
 
   // ------------------------------------------------------------------ save
@@ -170,7 +243,9 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
         <button type="button" data-save-local>Fichier local (télécharger)</button>
       </div>
       <p class="sub drive-help" hidden></p>
-      <p class="sub">${clientId() ? 'Connecté à Google, le fichier est lu et remplacé directement dans Drive.'
+      ${clientId() ? `<p>Dossier Drive : <strong>${folder() ? esc(folder().path) : 'pas encore choisi (demandé au premier usage)'}</strong>
+        <button type="button" class="linklike" data-folder>${folder() ? 'Changer' : 'Choisir'}</button></p>` : ''}
+      <p class="sub">${clientId() ? 'Connecté à Google, le fichier est lu et remplacé directement dans ce dossier Drive.'
         : isPhone() ? 'Sur téléphone, Google Drive apparaît dans le sélecteur de fichiers et dans le menu de partage.'
         : 'Sur ordinateur, sans connexion Google, le site ne peut pas lire Drive lui-même : une étape manuelle est expliquée au clic.'}</p>
       <h3>Éditeur de données</h3>
@@ -187,13 +262,15 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
     dialog.querySelector('[data-open-drive]').addEventListener('click', openFromDrive);
     dialog.querySelector('[data-save-drive]').addEventListener('click', () => saveToDrive().catch((e) => toast(e.message, 'error')));
     dialog.querySelector('[data-save-local]').addEventListener('click', saveLocal);
+    dialog.querySelector('[data-folder]')?.addEventListener('click', () => (loggedIn() ? Promise.resolve() : login())
+      .then(() => loggedIn() && guard(async () => { const d = await pickFolder(); if (d) toast(`Dossier Drive : ${d.path}`); })));
     dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
     dialog.querySelectorAll('[data-edit-json]').forEach((b) => b.addEventListener('click', () => { dialog.close(); openEditor?.(b.dataset.editJson); }));
     dialog.querySelectorAll('[data-export]').forEach((b) => b.addEventListener('click', () => data.downloadJson(b.dataset.export, app.files[b.dataset.export])));
     dialog.querySelector('[data-reset]').addEventListener('click', () => {
       if (!confirm(unsaved() ? 'Des modifications ne sont pas enregistrées sur Drive. Effacer quand même ?' : 'Effacer la copie de ce navigateur ? Il faudra rouvrir le fichier depuis Drive.')) return;
       data.FILES.forEach(data.dropWorking);
-      ['wb.file', 'wb.drive', 'wb.folder', 'wb.source'].forEach((k) => localStorage.removeItem(k));
+      ['wb.file', 'wb.drive', 'wb.folder', 'wb.source', FOLDER_KEY].forEach((k) => localStorage.removeItem(k));
       location.reload();
     });
   }

@@ -170,6 +170,8 @@ button.danger { color: var(--missing); border-color: var(--missing); margin-righ
 /* Stage g: journal + export */
 .journal-card { margin-top: 16px; }
 .per-rank-card { align-self: start; }
+.folder-items { list-style: none; padding: 0; margin: 6px 0; max-height: 45vh; overflow: auto; }
+.folder-items li { padding: 3px 0; }
 .per-rank-card table.mini td:first-child { width: 2.5em; color: var(--muted); }
 .journal-card summary { cursor: pointer; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; list-style: none; }
 .journal-card summary h2 { margin: 0; }

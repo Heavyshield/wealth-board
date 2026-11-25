@@ -1,7 +1,7 @@
 // Stage g: snapshot, export for Claude; plus the optional Drive login's file calls (fake Drive).
 
 import { makeSnapshot, addSnapshot, buildClaudeExport } from '../src/claude-export.js';
-import { driveFiles } from '../src/gdrive.js';
+import { driveFiles, driveFolders } from '../src/gdrive.js';
 
 export async function stageGTests({ test, assert, eq, files, schemas, validate, NOW, rows, expected }) {
   await test('Relevé : total = référence Python, répartitions cohérentes, fichier valide', () => {
@@ -54,5 +54,26 @@ export async function stageGTests({ test, assert, eq, files, schemas, validate, 
     let msg = '';
     try { await driveFiles('tok', 'x', async () => ({ ok: false, status: 401, json: async () => ({}) })).list(); } catch (e) { msg = e.message; }
     assert(/expirée/.test(msg), 'jeton expiré expliqué');
+  });
+
+  await test('Drive : dossier choisi (liste et création limitées au dossier, sous-dossiers, chemin)', async () => {
+    const calls = [];
+    const fake = async (url, init = {}) => {
+      calls.push({ url: decodeURIComponent(url), init });
+      const ok = (b) => ({ ok: true, status: 200, json: async () => b });
+      if (url.includes('/files/f2?')) return ok({ id: 'f2', name: 'Wealth Board', parents: ['f1'] });
+      if (url.includes('/files/f1?')) return ok({ id: 'f1', name: 'Finances', parents: ['r0'] });
+      if (url.includes('/files/r0?')) return ok({ id: 'r0', name: 'My Drive' });
+      if (url.includes('/files?q=')) return ok({ files: [{ id: 'a', name: 'Finances' }] });
+      return ok({ id: 'x', version: '1' });
+    };
+    await driveFiles('tok', 'wealth-board.json', fake, 'f2').list();
+    assert(calls[0].url.includes("name='wealth-board.json' and trashed=false and 'f2' in parents"), calls[0].url);
+    await driveFiles('tok', 'wealth-board.json', fake, 'f2').create('{}');
+    assert(calls.at(-1).init.body.includes('"parents":["f2"]'), 'créé dans le dossier');
+    const folders = driveFolders('tok', fake);
+    eq((await folders.children('root'))[0].name, 'Finances', 'sous-dossiers');
+    assert(calls.at(-1).url.includes("mimeType='application/vnd.google-apps.folder' and 'root' in parents"), calls.at(-1).url);
+    eq((await folders.path('f2')).map((p) => p.name).join(' / '), 'Mon Drive / Finances / Wealth Board', 'chemin');
   });
 }

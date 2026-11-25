@@ -207,7 +207,8 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - Optional desktop login (`config.drive.client_id`, set 2026-11-25, origin authorised: GitHub Pages only, NOT localhost;
   the user's file config wins, else the site's data/config.json; empty = hidden): GIS token in memory, scope `drive` (full) because
   files saved from the phone's share sheet are not visible with drive.file. Code only touches files named
-  wealth-board.json: open newest, offer to trash older copies, save = PATCH in place after a version check
+  wealth-board.json inside ONE folder chosen once per device (localStorage `wb.drive_folder` {id, path}; picker starts
+  where the newest existing copy lives; "Changer" in Données): open newest, offer to trash older copies, save = PATCH in place after a version check
   (changed since opened -> confirm). No background sync.
 - `repo data/*.json` stay FAKE sample data (commit hook).
 

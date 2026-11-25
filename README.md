@@ -109,7 +109,7 @@ Google n'est demandée par le site.
 - Premier enregistrement : partez des données d'exemple ou de votre import, puis « Enregistrer sur Drive ».
 
 ### Connexion Google Drive sur ordinateur (optionnelle)
-Avec la connexion, « Ouvrir » prend directement le `wealth-board.json` le plus récent de votre Drive (et propose de
+Avec la connexion, la première fois, le site demande dans quel dossier Drive ranger le fichier (gardé sur cet appareil, « Changer » dans Données). « Ouvrir » prend ensuite le `wealth-board.json` le plus récent de ce dossier (et propose de
 mettre à la corbeille les anciennes copies créées depuis le téléphone), « Enregistrer » le remplace sur place
 (Drive garde l'ancienne version dans son historique). Si le fichier a changé sur Drive depuis l'ouverture, le site
 demande avant d'écraser. Le téléphone n'en a pas besoin.
