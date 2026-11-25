@@ -6,6 +6,7 @@
 // what was last saved.
 
 import * as data from './data.js';
+import { signIn, driveFiles } from './gdrive.js';
 
 const META = 'wb.file'; // { name, opened_at, saved_at }
 const when = (iso) => (iso ? new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
@@ -37,20 +38,62 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton }) {
     for (const file of fileList) {
       try { objects.push({ name: file.name, obj: JSON.parse(await file.text()) }); } catch (e) { toast(`${file.name} : JSON illisible (${e.message})`, 'error'); }
     }
+    return openObjects(objects, fileList.length > 1 ? `${fileList.length} fichiers` : fileList[0]?.name);
+  }
+
+  /** Validate + load opened objects. Returns true when loaded. */
+  async function openObjects(objects, label, extraMeta = {}) {
     const { files, problems } = data.readOpened(objects);
     problems.forEach((p) => toast(p, 'error'));
-    if (!Object.keys(files).length) return;
+    if (!Object.keys(files).length) return false;
     const errs = data.validateAll({ ...app.files, ...files }, app.schemas);
     const bad = Object.keys(files).filter((f) => errs[f]);
-    if (bad.length) { toast(`Fichier refusé : ${bad[0]} · ${errs[bad[0]][0].path} : ${errs[bad[0]][0].message}`, 'error'); return; }
+    if (bad.length) { toast(`Fichier refusé : ${bad[0]} · ${errs[bad[0]][0].path} : ${errs[bad[0]][0].message}`, 'error'); return false; }
     const older = files.portfolio && !isSample() && files.portfolio.revision < app.files.portfolio.revision;
-    if (unsaved() && !confirm('Vos modifications ici ne sont pas encore enregistrées sur Drive. Les remplacer par ce fichier ?')) return;
-    if (older && !confirm(`Ce fichier (rév. ${files.portfolio.revision}) est plus ancien que les données affichées (rév. ${app.files.portfolio.revision}). L'ouvrir quand même ?`)) return;
+    if (unsaved() && !confirm('Vos modifications ici ne sont pas encore enregistrées sur Drive. Les remplacer par ce fichier ?')) return false;
+    if (older && !confirm(`Ce fichier (rév. ${files.portfolio.revision}) est plus ancien que les données affichées (rév. ${app.files.portfolio.revision}). L'ouvrir quand même ?`)) return false;
     for (const [f, d] of Object.entries(files)) { data.saveWorking(f, d, app.source[f].revision, { dirty: false }); app.files[f] = d; }
-    setMeta({ name: fileList[0].name, opened_at: new Date().toISOString(), saved_at: null });
+    setMeta({ name: label, opened_at: new Date().toISOString(), saved_at: null, drive_id: null, drive_version: null, ...extraMeta });
     render(); refresh();
-    toast(`Ouvert : ${fileList.length > 1 ? `${fileList.length} fichiers` : fileList[0].name} (portefeuille rév. ${app.files.portfolio.revision}).`);
+    toast(`Ouvert : ${label} (portefeuille rév. ${app.files.portfolio.revision}).`);
+    return true;
   }
+
+  // ------------------------------------------------------------------ optional Drive login (computer)
+  let session = null; // { token, expires } -- memory only
+  const clientId = () => app.files.config.drive?.client_id;
+  const loggedIn = () => session && Date.now() < session.expires;
+  const files = () => driveFiles(session.token, data.BUNDLE_NAME);
+  async function guard(fn) {
+    try { await fn(); } catch (e) { toast(e.message, 'error'); if (/expirée/.test(e.message)) session = null; }
+    updateBadge(); refresh();
+  }
+  const login = () => guard(async () => { session = await signIn(clientId()); toast('Connecté à Google Drive.'); });
+  const openDrive = () => guard(async () => {
+    const all = await files().list();
+    if (!all.length) { toast(`Aucun ${data.BUNDLE_NAME} sur Drive : utilisez « Enregistrer sur Drive » une première fois.`); return; }
+    const [newest, ...older] = all;
+    const obj = JSON.parse(await files().read(newest.id));
+    const ok = await openObjects([{ name: newest.name, obj }], `Drive (${when(newest.modifiedTime)})`, { drive_id: newest.id, drive_version: newest.version });
+    if (ok && older.length && confirm(`${all.length} copies de ${data.BUNDLE_NAME} sur Drive (enregistrements depuis le téléphone). La plus récente est ouverte. Mettre les ${older.length} autres à la corbeille de Drive (récupérables 30 jours) ?`)) {
+      for (const o of older) await files().trash(o.id);
+      toast(`${older.length} ancienne(s) copie(s) mise(s) à la corbeille.`);
+    }
+  });
+  const saveDrive = () => guard(async () => {
+    const text = data.makeBundle(app.files);
+    const m = meta();
+    let target = m.drive_id ? await files().meta(m.drive_id).catch(() => null) : null;
+    if (!target) target = (await files().list())[0] ?? null;
+    if (target && String(target.version) !== String(m.drive_version ?? '')) {
+      const who = target.lastModifyingUser?.displayName;
+      if (!confirm(`${data.BUNDLE_NAME} sur Drive a été modifié le ${when(target.modifiedTime)}${who ? ` (${who})` : ''} depuis votre ouverture. Le remplacer par la version affichée ici ?\n(Annuler, puis « Ouvrir depuis Drive » pour récupérer l'autre version.)`)) return;
+    }
+    const saved = target ? await files().update(target.id, text) : await files().create(text);
+    for (const f of data.FILES) data.saveWorking(f, app.files[f], app.source[f].revision, { dirty: false });
+    setMeta({ saved_at: new Date().toISOString(), drive_id: saved.id, drive_version: saved.version });
+    toast(target ? `${data.BUNDLE_NAME} remplacé sur Drive (version précédente gardée dans l'historique Drive).` : `${data.BUNDLE_NAME} créé sur Drive.`);
+  });
 
   // ------------------------------------------------------------------ save
   async function save() {
@@ -80,6 +123,12 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton }) {
       <p>${isSample() ? 'Affiché : <strong>données d’exemple</strong>.'
         : `Affiché : portefeuille rév. ${app.files.portfolio.revision}${m.name ? ` · ouvert depuis ${esc(m.name)} le ${when(m.opened_at)}` : ''}${m.saved_at ? ` · enregistré le ${when(m.saved_at)}` : ''}.`}
         ${unsaved() ? '<br><strong>Modifications non enregistrées sur Drive.</strong>' : ''}</p>
+      ${clientId() ? `<section class="drive-login"><h3>Connexion Google Drive (ordinateur, optionnelle)</h3>
+        ${loggedIn()
+          ? `<div class="data-steps"><button type="button" class="primary" data-d="open">Ouvrir depuis Drive (connecté)</button>
+             <button type="button" class="primary" data-d="save">Enregistrer sur Drive (remplace le fichier)</button></div>`
+          : '<div class="data-steps"><button type="button" data-d="login">Se connecter à Google Drive</button></div>'}
+        </section><h3>Sans connexion (téléphone)</h3>` : ''}
       <div class="data-steps">
         <label class="button-like primary-like">1. Ouvrir depuis Drive…<input type="file" accept=".json,application/json" multiple data-open hidden></label>
         <button type="button" class="primary" data-save>2. Enregistrer sur Drive${share ? ' (partager)' : ' (télécharger)'}</button>
@@ -95,6 +144,9 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton }) {
       </details>
       <div class="dialog-actions"><button type="button" data-close>Fermer</button></div></form>`;
     dialog.querySelector('[data-open]').addEventListener('change', (e) => open(e.target.files));
+    dialog.querySelector('[data-d="login"]')?.addEventListener('click', login);
+    dialog.querySelector('[data-d="open"]')?.addEventListener('click', openDrive);
+    dialog.querySelector('[data-d="save"]')?.addEventListener('click', saveDrive);
     dialog.querySelector('[data-save]').addEventListener('click', save);
     dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
     dialog.querySelectorAll('[data-export]').forEach((b) => b.addEventListener('click', () => data.downloadJson(b.dataset.export, app.files[b.dataset.export])));

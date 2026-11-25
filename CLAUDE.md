@@ -14,7 +14,7 @@ Footer must always read: "Outil de suivi, pas un conseil en investissement."
 "Retirer les données d'exemple"
 - [x] (f) storage = ONE file wealth-board.json on Google Drive, opened / saved by the user (no OAuth). The OAuth
   sync built first (commit 6aa2c45) was removed 2026-11-25 at the user's request: too convoluted.
-- [ ] (g) "Export for Claude" + snapshot button
+- [x] (g) snapshot button (history.json, one per day), "Copier pour Claude" (Markdown + JSON), changelog view
 
 ## Layout
 ```
@@ -36,6 +36,9 @@ src/csv.js          tolerant CSV: UTF-8/BOM or Windows-1252, ; , tab, RFC 4180 q
 src/importer.js     column mapping via config.imports, diff vs one envelope, applyImport (changelog per change)
 src/editors.js      dialogs: ticker assistant, line editor -- all via data.js
 src/data-ui.js      "Données" window (open wealth-board.json / save it: share sheet or download) + header badge
+src/gdrive.js       OPTIONAL desktop Google login: newest wealth-board.json, overwrite in place, trash old copies
+src/claude-export.js  makeSnapshot / addSnapshot / buildClaudeExport (pure)
+src/journal.js      changelog view, filter by author (Claude highlighted)
 src/import-ui.js    "Importer CSV" dialog: format, envelope, file -> mapping + diff with checkboxes -> apply
 tests/import.test.js + tests/fixtures/boursorama-fake-*.csv  FAKE exports (EN/FR headers, cp1252, missing column)
 src/format.js       fr-FR formatting + parsing of typed numbers
@@ -156,7 +159,17 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - **Claude editing the data:** read `wealth-board.json` from Drive, edit the part(s), bump that part's `revision` +
   `updated_at`, add changelog entries (`author: "claude"`), validate against /schema, write the file back (or give it
   to the user to put on Drive). The user then re-opens it in the board.
+- Optional desktop login (`config.drive.client_id`, empty = hidden): GIS token in memory, scope `drive` (full) because
+  files saved from the phone's share sheet are not visible with drive.file. Code only touches files named
+  wealth-board.json: open newest, offer to trash older copies, save = PATCH in place after a version check
+  (changed since opened -> confirm). No background sync.
 - `repo data/*.json` stay FAKE sample data (commit hook).
+
+## Snapshot and export (src/claude-export.js)
+- Snapshot = { date (local day), base_currency, total, cost, by_envelope, by_asset_class, by_currency, live_share };
+  same day replaces (confirm). Saved to the history working copy (dirty) -> user saves wealth-board.json.
+- Export for Claude = Markdown (summary, allocation, targets, review items, constraints, last 15 changelog entries
+  with ISO dates) + one compact JSON block of all lines. Clipboard, or a textarea fallback when blocked.
 
 ## CSV import (src/importer.js)
 - Real Boursorama export format is not publicly documented (checked 2026-11-25): "Positions" tab -> "Exporter en CSV",

@@ -107,3 +107,30 @@ Google n'est demandée par le site.
   demande confirmation.
 - Premier enregistrement : partez des données d'exemple ou de votre import, puis « Enregistrer sur Drive ».
 
+### Connexion Google Drive sur ordinateur (optionnelle)
+Avec la connexion, « Ouvrir » prend directement le `wealth-board.json` le plus récent de votre Drive (et propose de
+mettre à la corbeille les anciennes copies créées depuis le téléphone), « Enregistrer » le remplace sur place
+(Drive garde l'ancienne version dans son historique). Si le fichier a changé sur Drive depuis l'ouverture, le site
+demande avant d'écraser. Le téléphone n'en a pas besoin.
+
+Réglage unique (15 min) :
+1. https://console.cloud.google.com/ → **Nouveau projet** `wealth-board` → le sélectionner.
+2. **API et services → Bibliothèque** → **Google Drive API** → **Activer**.
+3. **Écran de consentement OAuth** (« Google Auth Platform ») → **Commencer** : nom `Wealth Board`, votre e-mail,
+   audience **Externe** → **Créer**. Puis **Audience → Utilisateurs test → Ajouter** : votre adresse Gmail.
+4. **Clients → Créer un client** → **Application Web** → **Origines JavaScript autorisées** :
+   `https://heavyshield.github.io` et `http://localhost:8770` → **Créer**.
+5. Copier l'ID client (`….apps.googleusercontent.com`) dans `data/config.json` → `"drive": { "client_id": "…" }`
+   → commit + push. Ce n'est pas un secret (il ne marche que depuis ces deux adresses).
+6. Site → **Données** → **Se connecter à Google Drive**. Google affiche « application non validée » (c'est la vôtre,
+   en mode test) → **Continuer**. Il demande l'accès à Google Drive : le site ne lit et n'écrit que `wealth-board.json`.
+   (Accès Drive complet nécessaire : un fichier enregistré depuis le téléphone n'est pas visible avec l'accès minimal.)
+   La connexion dure environ une heure, puis il suffit de recliquer.
+
+## Relevés, export pour Claude, journal
+- **Enregistrer le relevé du jour** (carte « Évolution du patrimoine ») : ajoute la valeur du jour et sa répartition
+  à l'historique (un relevé par jour, remplaçable). Puis enregistrez sur Drive.
+- **Copier pour Claude** (en-tête) : copie un résumé (synthèse, répartition, à revoir, dernières modifications +
+  toutes les lignes en JSON) à coller dans une conversation avec Claude. Données personnelles : ne le collez pas ailleurs.
+- **Journal des modifications** (sous le tableau) : chaque changement, par vous ou par Claude, avec avant → après.
+

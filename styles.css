@@ -164,6 +164,15 @@ button.danger { color: var(--missing); border-color: var(--missing); margin-righ
 .data-steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 6px; }
 .primary-like { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 
+/* Stage g: journal + export */
+.journal-card { margin-top: 16px; }
+.journal-card summary { cursor: pointer; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; list-style: none; }
+.journal-card summary h2 { margin: 0; }
+.journal-card .seg-control { margin: 10px 0; }
+tr.by-claude td { background: color-mix(in srgb, var(--manual) 10%, transparent); }
+.who-claude { font-weight: 600; color: var(--manual); }
+.export-text { width: 100%; font: .8rem/1.4 ui-monospace, Consolas, monospace; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+
 /* Chart cards */
 .viz { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .card h2 { margin: 0; font-size: 1rem; }

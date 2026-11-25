@@ -11,6 +11,8 @@ import * as prices from './prices.js';
 import { initImport } from './import-ui.js';
 import { createEditors } from './editors.js';
 import { initDataUI } from './data-ui.js';
+import { makeSnapshot, addSnapshot, buildClaudeExport } from './claude-export.js';
+import { renderJournal } from './journal.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -80,7 +82,10 @@ function render() {
   const rows = evaluateRules(valueHoldings({ portfolio: merged.portfolio, config, now, quotes: merged.quotes }), config, now);
   app.rows = rows;
   const constraints = evaluateConstraints(rows, portfolio, config);
-  renderReview($('#review'), reviewItems(rows, constraints, config, fmt), { onSelect: focusTarget });
+  app.constraints = constraints;
+  app.review = reviewItems(rows, constraints, config, fmt);
+  renderReview($('#review'), app.review, { onSelect: focusTarget });
+  renderJournal($('#journal'), portfolio);
   renderConstraints($('#constraints'), constraints);
   $('#sample-banner').hidden = !portfolio.sample_data;
   $('#rev').textContent = `rév. ${portfolio.revision}`;
@@ -142,6 +147,35 @@ function saveLocal(file, next) {
   data.saveWorking(file, next, app.source[file].revision, { dirty: true });
   app.files[file] = next;
   app.dataUI?.afterLocalSave(file);
+}
+
+// ---------------------------------------------------------------- stage g: snapshot + export for Claude
+function takeSnapshot() {
+  const snap = makeSnapshot(app.rows, app.files.config);
+  if (app.files.portfolio.sample_data && !confirm('Les données affichées sont des données d\u2019exemple. Enregistrer quand même un relevé ?')) return;
+  const exists = app.files.history.snapshots.some((s) => s.date === snap.date);
+  if (exists && !confirm(`Un relevé existe déjà pour le ${snap.date}. Le remplacer par les valeurs actuelles ?`)) return;
+  const { history } = addSnapshot(app.files.history, snap);
+  const errs = data.validateAll({ ...app.files, history }, app.schemas);
+  if (errs.history) { toast(`Relevé refusé : ${errs.history[0].path} : ${errs.history[0].message}`, 'error'); return; }
+  saveLocal('history', history);
+  render();
+  toast(`Relevé du ${snap.date} enregistré : ${fmt.money(snap.total, app.files.config.base_currency, { digits: 0 })}. Pensez à enregistrer sur Drive.`);
+}
+
+async function exportForClaude() {
+  const text = buildClaudeExport({ rows: app.rows, files: app.files, constraints: app.constraints, review: app.review, refreshedAt: app.refreshed_at });
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(`Résumé copié (${Math.round(text.length / 100) / 10} k caractères) : collez-le dans votre conversation avec Claude.`);
+  } catch {
+    // Clipboard blocked (permissions, http): show it to copy by hand.
+    const dlg = $('#export-dialog');
+    dlg.innerHTML = `<form method="dialog" class="editor"><h2>Résumé pour Claude</h2><p class="sub-title">Copie automatique impossible : sélectionnez et copiez.</p>
+      <textarea readonly rows="16" class="export-text">${esc(text)}</textarea><div class="dialog-actions"><button class="primary">Fermer</button></div></form>`;
+    dlg.showModal();
+    dlg.querySelector('textarea').select();
+  }
 }
 
 /** Validate + save a new portfolio from any editor. Returns true on success. */
@@ -276,6 +310,8 @@ async function main() {
       })));
     if (unknown.length) showErrors({ config: unknown });
     initSettings();
+    $('#snapshot').addEventListener('click', takeSnapshot);
+    $('#claude-export').addEventListener('click', exportForClaude);
     app.dataUI = initDataUI({ app, render, toast, dialog: $('#data'), badge: $('#sync-badge'), openButton: $('#open-data') });
     app.editors = createEditors({ dialog: $('#editor'), getState: () => ({ portfolio: app.files.portfolio, config: app.files.config }), commit: commitPortfolio });
     $('#remove-sample').addEventListener('click', removeSample);

@@ -10,6 +10,7 @@ import { pricesTests } from './prices.test.js';
 import { importTests } from './import.test.js';
 import { editingTests } from './editing.test.js';
 import { filesTests } from './files.test.js';
+import { stageGTests } from './stage-g.test.js';
 import { evaluateRules, evaluateHolding, evaluateConstraints, reviewItems } from '../src/rules.js';
 
 const results = [];
@@ -238,6 +239,9 @@ await editingTests({ test, assert, eq, files, schemas, validate, NOW });
 
 // ---------------------------------------------------------------- single-file storage (Drive)
 await filesTests({ test, assert, eq, files, schemas, validate, NOW });
+
+// ---------------------------------------------------------------- stage g: snapshot, export, optional Drive login
+await stageGTests({ test, assert, eq, files, schemas, validate, NOW, rows, expected });
 
 const failed = results.filter((r) => !r.ok);
 window.testResults = { pass: results.length - failed.length, fail: failed.length, results };

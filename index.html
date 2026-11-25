@@ -20,6 +20,7 @@
       <button type="button" id="refresh" class="primary">Actualiser les cours</button>
       <button type="button" id="open-import">Importer CSV</button>
       <button type="button" id="open-settings">Réglages</button>
+      <button type="button" id="claude-export" title="Copier un résumé (Markdown + JSON) à coller dans une conversation avec Claude">Copier pour Claude</button>
       <button type="button" id="open-data">Données</button>
       <button type="button" id="theme" aria-label="Basculer clair / sombre">◐</button>
     </nav>
@@ -56,7 +57,7 @@
       </article>
 
       <article class="card" id="card-history">
-        <header class="card-head"><div><h2>Évolution du patrimoine</h2><p class="sub-title">Relevés de history.json</p></div>
+        <header class="card-head"><div><h2>Évolution du patrimoine</h2><p class="sub-title">Relevés de history.json · <button type="button" class="linklike small" id="snapshot">Enregistrer le relevé du jour</button></p></div>
           <ul class="legend-inline" hidden><li><span class="key key-total"></span>Patrimoine</li><li><span class="key key-muted"></span>Investi</li></ul></header>
         <div class="chart-box" style="height:260px"><canvas aria-label="Évolution du patrimoine"></canvas></div>
         <details><summary>Voir les données</summary><div class="data-table"></div></details>
@@ -80,11 +81,13 @@
       <h2 id="h-holdings">Lignes</h2>
       <div id="holdings"></div>
     </section>
+    <section id="journal" class="card journal-card" aria-label="Journal des modifications"></section>
   </main>
 
   <dialog id="import" class="wide" aria-labelledby="import-title"></dialog>
   <dialog id="editor" class="wide"></dialog>
   <dialog id="data" class="wide" aria-label="Données"></dialog>
+  <dialog id="export-dialog" class="wide" aria-label="Résumé pour Claude"></dialog>
 
   <dialog id="settings" aria-labelledby="settings-title">
     <form method="dialog" id="settings-form">

@@ -491,6 +491,16 @@
           }
         }
       }
+    },
+    "drive": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "description": "Optional Google OAuth client ID (desktop login). Public, restricted to authorized origins."
+        }
+      }
     }
   },
   "$defs": {

@@ -326,5 +326,8 @@
       "asset_class_default": "equity",
       "etf_name_pattern": "(^|[^A-Z])(ETF|UCITS|TRACKER|MSCI|STOXX|NASDAQ)([^A-Z]|$)"
     }
+  },
+  "drive": {
+    "client_id": ""
   }
 }
