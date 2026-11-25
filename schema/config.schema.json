@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "config.schema.json",
+  "title": "Wealth Board config",
+  "type": "object",
+  "required": ["schema_version", "revision", "updated_at", "base_currency", "locale", "envelopes", "asset_classes"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "revision": { "type": "integer", "minimum": 1 },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "base_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+    "locale": { "type": "string" },
+    "envelopes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "label": { "type": "string" },
+          "institution": { "type": "string" },
+          "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+        }
+      }
+    },
+    "asset_classes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "pricing"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "label": { "type": "string" },
+          "pricing": { "enum": ["quote", "spot", "par"] }
+        }
+      }
+    },
+    "regions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "by_country": { "type": "object", "additionalProperties": { "type": "string" } },
+        "unknown_label": { "type": "string" }
+      }
+    },
+    "prices": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stale_after_hours": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "quote": { "type": "number", "minimum": 0 },
+            "spot": { "type": "number", "minimum": 0 },
+            "fx": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_columns": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,38 @@
+# --- Claude Code workspace: local only, never published ---
+.claude/
+
+# --- Personal financial data: never published ---
+# The repo's data/*.json hold FAKE sample data only. Keep real data outside the repo
+# (Google Drive) or in one of these ignored places.
+private/
+real-data/
+*.local.json
+*.private.json
+data/*.real.json
+# Broker / bank exports (Boursorama CSV etc.). Test fixtures are the only CSVs allowed.
+*.csv
+*.xlsx
+*.xls
+*.ofx
+*.qif
+*.pdf
+!tests/fixtures/*.csv
+# Downloaded working copies from the app's export / conflict buttons
+*.mine.json
+portfolio (*).json
+config (*).json
+history (*).json
+
+# --- Secrets (API keys, OAuth client secrets) ---
+.env
+.env.*
+*secret*
+*credentials*
+*.key
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+__pycache__/

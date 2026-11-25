@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Wealth Board</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Wealth Board</h1>
+    <span id="rev" class="rev"></span>
+    <nav class="top-actions">
+      <button type="button" id="export">Exporter portfolio.json</button>
+      <button type="button" id="reset-local">Réinitialiser la copie locale</button>
+      <button type="button" id="theme" aria-label="Basculer clair / sombre">◐</button>
+    </nav>
+  </header>
+
+  <main>
+    <p id="sample-banner" class="banner" hidden>Données d'exemple fictives. Vos données réelles se chargeront depuis Google Drive ou un dossier local.</p>
+    <section id="errors" class="errors" role="alert" hidden></section>
+    <section id="conflicts" class="conflicts" hidden></section>
+    <section id="summary" class="summary" aria-label="Synthèse"></section>
+    <section aria-labelledby="h-holdings">
+      <h2 id="h-holdings">Lignes</h2>
+      <div id="holdings"></div>
+    </section>
+  </main>
+
+  <footer class="foot">Outil de suivi, pas un conseil en investissement.</footer>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

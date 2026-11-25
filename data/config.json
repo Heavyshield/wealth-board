@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "updated_at": "2026-11-24T00:00:00Z",
+  "base_currency": "EUR",
+  "locale": "fr-FR",
+  "envelopes": [
+    { "id": "pea", "label": "PEA", "institution": "Boursorama", "currency": "EUR" },
+    { "id": "cto", "label": "CTO", "institution": "Interactive Brokers", "currency": "EUR" },
+    { "id": "livret", "label": "Livrets / cash", "institution": "Caisse d'Épargne", "currency": "EUR" },
+    { "id": "metals", "label": "Métaux", "institution": "Gold Avenue + coffre", "currency": "EUR" },
+    { "id": "swiss", "label": "Épargne suisse", "institution": "Banque suisse", "currency": "CHF" },
+    { "id": "home_cash", "label": "Espèces", "institution": "Domicile", "currency": "EUR" }
+  ],
+  "asset_classes": [
+    { "id": "equity", "label": "Actions", "pricing": "quote" },
+    { "id": "etf", "label": "ETF", "pricing": "quote" },
+    { "id": "metal", "label": "Métaux", "pricing": "spot" },
+    { "id": "cash", "label": "Cash", "pricing": "par" },
+    { "id": "account", "label": "Comptes", "pricing": "par" }
+  ],
+  "regions": {
+    "by_country": {
+      "FR": "Europe", "DE": "Europe", "NL": "Europe", "IT": "Europe", "ES": "Europe", "BE": "Europe",
+      "SE": "Nordiques", "NO": "Nordiques", "DK": "Nordiques", "FI": "Nordiques",
+      "CH": "Suisse", "GB": "Royaume-Uni", "US": "Amérique du Nord", "CA": "Amérique du Nord",
+      "JP": "Asie", "IE": "Monde (ETF)", "LU": "Monde (ETF)"
+    },
+    "unknown_label": "Non renseignée"
+  },
+  "prices": {
+    "stale_after_hours": { "quote": 72, "spot": 72, "fx": 96 }
+  },
+  "table": {
+    "default_columns": ["name", "envelope", "asset_class", "quantity", "unit_cost", "price", "value_base", "pnl_base", "pnl_pct", "notes"]
+  }
+}

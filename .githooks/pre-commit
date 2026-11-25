@@ -1,0 +1,21 @@
+#!/bin/sh
+# Refuse commits that would publish real financial data to the public repo.
+# Rule: every staged data/*.json must still contain  "sample_data": true
+# (config.json holds settings only and is exempt).
+# Enable once per clone:  git config core.hooksPath .githooks
+
+fail=0
+for f in $(git diff --cached --name-only --diff-filter=ACM -- 'data/*.json'); do
+  [ "$f" = "data/config.json" ] && continue
+  if ! git show ":$f" | grep -Eq '"sample_data"[[:space:]]*:[[:space:]]*true'; then
+    echo "BLOQUÉ : $f ne contient pas \"sample_data\": true -- données réelles ?" >&2
+    fail=1
+  fi
+done
+for f in $(git diff --cached --name-only --diff-filter=ACM); do
+  case "$f" in
+    *.csv|*.xlsx|*.xls|*.ofx|*.qif|*.pdf)
+      case "$f" in tests/fixtures/*) ;; *) echo "BLOQUÉ : export bancaire $f" >&2; fail=1 ;; esac ;;
+  esac
+done
+[ $fail -eq 0 ] || { echo "Commit annulé (voir .githooks/pre-commit)." >&2; exit 1; }

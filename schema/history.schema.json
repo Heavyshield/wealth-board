@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "history.schema.json",
+  "title": "Wealth Board net-worth history",
+  "type": "object",
+  "required": ["schema_version", "revision", "updated_at", "snapshots"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "revision": { "type": "integer", "minimum": 1 },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "sample_data": { "type": "boolean" },
+    "snapshots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["date", "base_currency", "total"],
+        "additionalProperties": false,
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "base_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+          "total": { "type": "number" },
+          "cost": { "type": "number" },
+          "by_envelope": { "type": "object", "additionalProperties": { "type": "number" } },
+          "by_asset_class": { "type": "object", "additionalProperties": { "type": "number" } },
+          "by_currency": { "type": "object", "additionalProperties": { "type": "number" } },
+          "live_share": { "type": "number", "minimum": 0, "maximum": 1 },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

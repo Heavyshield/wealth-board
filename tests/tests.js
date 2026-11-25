@@ -1,0 +1,115 @@
+// Browser test runner. Open /tests.html; results also in window.testResults.
+// The valuation check compares against tests/expected.json, produced by an independent
+// Python/Decimal implementation (tests/compute_expected.py).
+
+import { validate } from '../src/schema.js';
+import { loadSchemas, validateAll, crossCheck, applyEdits } from '../src/data.js';
+import { valueHoldings, totals } from '../src/valuation.js';
+import * as fmt from '../src/format.js';
+
+const results = [];
+const test = async (name, fn) => {
+  try { await fn(); results.push({ name, ok: true }); }
+  catch (e) { results.push({ name, ok: false, error: e.message }); }
+};
+const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
+const eq = (a, b, msg) => assert(a === b, `${msg} : attendu ${JSON.stringify(b)}, reçu ${JSON.stringify(a)}`);
+const getJson = async (p) => (await fetch(p, { cache: 'no-store' })).json();
+const spaces = (s) => s.replace(/[  ]/g, ' ');
+
+const NOW = new Date('2026-11-24T22:00:00Z');
+
+const schemas = await loadSchemas('..');
+const files = { portfolio: await getJson('../data/portfolio.json'), config: await getJson('../data/config.json'), history: await getJson('../data/history.json') };
+const expected = await getJson('./expected.json');
+
+await test('Schémas : les 3 fichiers de données sont valides', () => {
+  const errs = validateAll(files, schemas);
+  assert(Object.keys(errs).length === 0, JSON.stringify(errs));
+});
+
+await test('Schéma : champ inconnu, date invalide, type faux, champ manquant détectés', () => {
+  const bad = structuredClone(files.portfolio);
+  bad.holdings[0].quantitty = 3;                 // typo
+  bad.holdings[1].updated_at = '2026-13-45';     // bad date
+  bad.holdings[2].quantity = '25';               // string instead of number
+  delete bad.holdings[3].currency;               // missing required
+  const errs = validate(schemas.portfolio, bad);
+  const text = JSON.stringify(errs);
+  assert(text.includes('holdings[0].quantitty'), 'typo non détectée');
+  assert(text.includes('holdings[1].updated_at'), 'date non détectée');
+  assert(text.includes('holdings[2].quantity'), 'type non détecté');
+  assert(text.includes('currency'), 'champ manquant non détecté');
+});
+
+await test('Contrôle croisé : enveloppe inconnue et id en double détectés', () => {
+  const bad = structuredClone(files.portfolio);
+  bad.holdings[0].envelope = 'pea_typo';
+  bad.holdings[1].id = bad.holdings[2].id;
+  const text = JSON.stringify(crossCheck(bad, files.config));
+  assert(text.includes('pea_typo'), 'enveloppe inconnue non détectée');
+  assert(text.includes('id en double'), 'doublon non détecté');
+});
+
+const rows = valueHoldings({ portfolio: files.portfolio, config: files.config, now: NOW });
+
+await test('Valorisation ligne à ligne = référence Python (au centime)', () => {
+  for (const r of rows) {
+    const e = expected.lines[r.id];
+    assert(e, `ligne ${r.id} absente de expected.json (relancer compute_expected.py)`);
+    eq(r.value_base_cents, e.value_cents, `valeur ${r.id}`);
+    eq(r.cost_base_cents, e.cost_cents, `coût ${r.id}`);
+  }
+});
+
+await test('Total patrimoine = référence Python (au centime)', () => {
+  const t = totals(rows);
+  eq(t.value_cents, expected.total_value_cents, 'total');
+});
+
+await test('Statuts de prix : à jour / périmé / manuel / solde', () => {
+  const s = Object.fromEntries(rows.map((r) => [r.id, r.price.status]));
+  eq(s['pea-exemple-industries'], 'live', 'cours récent');
+  eq(s['pea-demo-energie'], 'stale', 'cours du 10/11');
+  eq(s['pea-etf-monde'], 'manual', 'prix manuel');
+  eq(s['livret-a'], 'balance', 'livret');
+  eq(s['metal-bar-100g'], 'live', 'spot récent');
+});
+
+await test('Prix absent : valorisé au PRU et signalé', () => {
+  const p = structuredClone(files.portfolio);
+  delete p.holdings[0].last_price;
+  const r = valueHoldings({ portfolio: p, config: files.config, now: NOW })[0];
+  eq(r.price.status, 'missing', 'statut');
+  eq(r.value_base, 40 * 50, 'valeur au PRU');
+});
+
+await test('Effet de change isolé (SEK, taux d\'achat 11,0)', () => {
+  const r = rows.find((x) => x.id === 'cto-fjord-exempel');
+  // cost 21000 SEK: at 11.0 = 1909.09, at 11.5 = 1826.09 -> FX effect -83.00
+  eq(Math.round(r.pnl_fx_base * 100), -8300, 'effet change');
+  eq(Math.round((r.pnl_local_base + r.pnl_fx_base) * 100), Math.round(r.pnl_base * 100), 'somme des effets');
+});
+
+await test('Édition : journal des changements + révision', () => {
+  const next = applyEdits(files.portfolio, { 'livret-a': { quantity: 12500, notes: 'test' } }, 'claude', NOW);
+  eq(next.revision, files.portfolio.revision + 1, 'révision');
+  eq(next.changelog.length, files.portfolio.changelog.length + 2, 'entrées journal');
+  const c = next.changelog.at(-2);
+  eq(c.old, 12000, 'ancienne valeur'); eq(c.new, 12500, 'nouvelle valeur'); eq(c.author, 'claude', 'auteur');
+  assert(validate(schemas.portfolio, next).length === 0, 'fichier édité invalide');
+  eq(files.portfolio.holdings.find((h) => h.id === 'livret-a').quantity, 12000, 'original non modifié');
+});
+
+await test('Format français : 1 234,56 € et saisie « 1 234,5 »', () => {
+  eq(spaces(fmt.money(1234.56, 'EUR')), '1 234,56 €', 'montant');
+  eq(spaces(fmt.pct(0.1234)), '+12,3 %', 'pourcentage');
+  eq(fmt.parseNumber('1 234,5'), 1234.5, 'saisie');
+  assert(Number.isNaN(fmt.parseNumber('abc')), 'saisie invalide');
+});
+
+const failed = results.filter((r) => !r.ok);
+window.testResults = { pass: results.length - failed.length, fail: failed.length, results };
+document.querySelector('#out').innerHTML = `<h2>${failed.length ? `❌ ${failed.length} échec(s)` : '✅ Tous les tests passent'} (${results.length})</h2>` +
+  '<ul>' + results.map((r) => `<li>${r.ok ? '✅' : '❌'} ${r.name}${r.ok ? '' : ` — <code>${r.error}</code>`}</li>`).join('') + '</ul>';
+document.title = failed.length ? 'FAIL' : 'PASS';

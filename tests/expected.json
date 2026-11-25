@@ -1,0 +1,55 @@
+{
+  "generated_by": "tests/compute_expected.py",
+  "total_value_cents": 4839214,
+  "total_cost_cents": 4768838,
+  "lines": {
+    "pea-exemple-industries": {
+      "value_cents": 250000,
+      "cost_cents": 200000
+    },
+    "pea-demo-energie": {
+      "value_cents": 241000,
+      "cost_cents": 300000
+    },
+    "pea-etf-monde": {
+      "value_cents": 231000,
+      "cost_cents": 200000
+    },
+    "cto-fjord-exempel": {
+      "value_cents": 205217,
+      "cost_cents": 190909
+    },
+    "cto-sample-corp": {
+      "value_cents": 155727,
+      "cost_cents": 136364
+    },
+    "livret-a": {
+      "value_cents": 1200000,
+      "cost_cents": 1200000
+    },
+    "livret-ldds": {
+      "value_cents": 600000,
+      "cost_cents": 600000
+    },
+    "swiss-savings": {
+      "value_cents": 869565,
+      "cost_cents": 869565
+    },
+    "home-cash-eur": {
+      "value_cents": 80000,
+      "cost_cents": 80000
+    },
+    "metal-napoleon-20f": {
+      "value_cents": 179170,
+      "cost_cents": 152000
+    },
+    "metal-bar-100g": {
+      "value_cents": 771541,
+      "cost_cents": 780000
+    },
+    "metal-silver-maple": {
+      "value_cents": 55994,
+      "cost_cents": 60000
+    }
+  }
+}
