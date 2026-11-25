@@ -69,7 +69,7 @@ export function createEditors({ dialog, getState, commit }) {
         if (cls?.checked) edits[row.dataset.id].asset_class = cls.dataset.cls;
       });
       const n = Object.keys(edits).length;
-      if (n && commit(data.applyEdits(getState().portfolio, edits, 'user'), `${n} ticker(s) enregistré(s).`, { refreshPrices: true })) close();
+      if (n && commit(data.applyEdits(getState().portfolio, edits, 'user'), `${n} ticker(s) enregistré(s).`)) close();
     });
   }
 
@@ -163,11 +163,11 @@ export function createEditors({ dialog, getState, commit }) {
       if (!h) {
         const holding = { id: makeId(line.envelope, line.name, new Set(state.holdings.map((x) => x.id))), ...line };
         for (const [k, val] of Object.entries(opt)) if (val !== undefined) holding[k] = val;
-        if (commit(data.addHolding(state, holding, 'user'), `Ligne ajoutée : ${line.name}.`, { refreshPrices: p !== 'par' })) close();
+        if (commit(data.addHolding(state, holding, 'user'), `Ligne ajoutée : ${line.name}.`)) close();
       } else {
         const edits = { ...line };
         for (const [k, val] of Object.entries(opt)) edits[k] = val ?? null; // null = remove the field
-        if (commit(data.applyEdits(state, { [h.id]: edits }, 'user'), `Ligne modifiée : ${line.name}.`, { refreshPrices: true })) close();
+        if (commit(data.applyEdits(state, { [h.id]: edits }, 'user'), `Ligne modifiée : ${line.name}.`)) close();
       }
     });
   }

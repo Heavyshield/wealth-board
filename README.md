@@ -94,14 +94,15 @@ Les nouvelles lignes n'ont pas de ticker : ajoutez-le (format Yahoo, ex. `TTE.PA
 Toutes vos données (lignes, réglages, historique) tiennent dans **un seul fichier : `wealth-board.json`**,
 rangé dans votre Google Drive (par ex. un dossier « Wealth Board »). Drive est la référence ; aucune connexion
 Google n'est demandée par le site.
-- **Ouvrir** : Données → « 1. Ouvrir depuis Drive… » → sur téléphone, choisir Google Drive dans le sélecteur
-  → `wealth-board.json`.
-- **Modifier** dans le tableau (✎, + Ajouter une ligne, Importer CSV…). Le badge passe à « Modifié · à enregistrer sur Drive ».
-- **Enregistrer** : Données → « 2. Enregistrer sur Drive ».
-  - Téléphone : menu de partage → « Enregistrer dans Drive » → dossier Wealth Board. Drive garde alors deux
-    fichiers du même nom : supprimez l'ancien pour n'en garder qu'un.
-  - Ordinateur : le fichier est téléchargé ; déposez-le dans le dossier Drive (Google Drive pour ordinateur ou
-    drive.google.com → Gérer les versions) en remplaçant l'ancien.
+- **Ouvrir** (Données) : « Depuis Google Drive » ou « Fichier local… ».
+  - Téléphone : Google Drive apparaît dans le sélecteur → `wealth-board.json`.
+  - Ordinateur : le site ne peut pas lire Drive sans connexion Google ; le bouton ouvre la recherche Drive pour
+    télécharger le fichier, puis « Fichier local… » (ou prenez-le directement dans le lecteur Google Drive pour ordinateur).
+- **Modifier** dans le tableau (✎, + Ajouter une ligne, Importer CSV, Éditeur de données). Le badge indique « Modifié · à enregistrer ».
+- **Enregistrer** : « Sur Google Drive » ou « Fichier local (télécharger) ».
+  - Téléphone : menu de partage → « Enregistrer dans Drive » → dossier Wealth Board ; supprimez ensuite l'ancienne copie.
+  - Ordinateur : le fichier est téléchargé et Drive s'ouvre : clic droit sur l'ancien `wealth-board.json` →
+    Gérer les versions → Importer une nouvelle version (un seul fichier, Drive garde l'historique).
 - Ce navigateur garde une copie pour s'ouvrir vite. Si Claude ou un autre appareil a modifié le fichier sur Drive,
   rouvrez-le. Ouvrir un fichier plus ancien que celui affiché, ou par-dessus des modifications non enregistrées,
   demande confirmation.

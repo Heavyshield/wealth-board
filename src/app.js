@@ -187,17 +187,18 @@ function commitFiles(next, message) {
   for (const f of data.FILES) if (next[f] !== app.files[f]) saveLocal(f, next[f]);
   render();
   toast(`${message}. Pensez à enregistrer sur Drive.`);
+  refreshPrices(false); // new currencies / tickers / metals: fetch what is missing (cached ones are not refetched)
   return true;
 }
 
 /** Validate + save a new portfolio from any editor. Returns true on success. */
-function commitPortfolio(next, message, { refreshPrices: refresh = false } = {}) {
+function commitPortfolio(next, message) {
   const errs = data.validateAll({ ...app.files, portfolio: next }, app.schemas);
   if (errs.portfolio) { toast(`Refusé : ${errs.portfolio[0].path} : ${errs.portfolio[0].message}`, 'error'); return false; }
   saveLocal('portfolio', next);
   render();
   toast(`${message} (rév. ${next.revision})`);
-  if (refresh) refreshPrices(false);
+  refreshPrices(false); // only fetches what the cache does not already have
   return true;
 }
 

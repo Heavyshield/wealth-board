@@ -25,9 +25,9 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
   function updateBadge() {
     const m = meta();
     let text, warn = false;
-    if (unsaved()) { text = 'Modifié · à enregistrer sur Drive'; warn = true; }
+    if (unsaved()) { text = 'Modifié · à enregistrer'; warn = true; }
     else if (isSample()) text = 'Données d’exemple';
-    else text = `Drive ✓ ${when(m.saved_at ?? m.opened_at)}`;
+    else text = `${m.saved_where === 'local' ? 'Enregistré (local)' : 'Enregistré'} ✓ ${when(m.saved_at ?? m.opened_at)}`;
     badge.textContent = text;
     badge.className = `sync-badge${warn ? ' warn' : ''}`;
   }
@@ -69,6 +69,7 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
     updateBadge(); refresh();
   }
   const login = () => guard(async () => { session = await signIn(clientId()); toast('Connecté à Google Drive.'); });
+  // (guard returns a promise: callers await login() then check loggedIn())
   const openDrive = () => guard(async () => {
     const all = await files().list();
     if (!all.length) { toast(`Aucun ${data.BUNDLE_NAME} sur Drive : utilisez « Enregistrer sur Drive » une première fois.`); return; }
@@ -96,20 +97,54 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
   });
 
   // ------------------------------------------------------------------ save
-  async function save() {
-    const text = data.makeBundle(app.files);
-    const file = new File([text], data.BUNDLE_NAME, { type: 'application/json' });
-    try {
-      if (canShare()) await navigator.share({ files: [file], title: 'Wealth Board' });
-      else data.downloadText(data.BUNDLE_NAME, text);
-    } catch (e) {
-      if (e.name === 'AbortError') { toast('Enregistrement annulé : rien n’a été marqué comme enregistré.'); return; }
-      data.downloadText(data.BUNDLE_NAME, text); // share failed for another reason: fall back to a download
-    }
+  // Phone = touch screen + share sheet with files: the share sheet offers "Enregistrer dans Drive".
+  const isPhone = () => matchMedia('(pointer: coarse)').matches && canShare();
+  const DRIVE_SEARCH = `https://drive.google.com/drive/search?q=${encodeURIComponent(data.BUNDLE_NAME)}`;
+
+  function markSaved(where) {
     for (const f of data.FILES) data.saveWorking(f, app.files[f], app.source[f].revision, { dirty: false });
-    setMeta({ saved_at: new Date().toISOString() });
+    setMeta({ saved_at: new Date().toISOString(), saved_where: where });
     updateBadge(); refresh();
-    toast(canShare() ? 'Fichier partagé : choisissez « Enregistrer dans Drive ».' : `${data.BUNDLE_NAME} téléchargé : déposez-le dans votre dossier Drive (en remplaçant l’ancien).`);
+  }
+
+  function saveLocal() {
+    data.downloadText(data.BUNDLE_NAME, data.makeBundle(app.files));
+    markSaved('local');
+    toast(`${data.BUNDLE_NAME} téléchargé (dossier Téléchargements).`);
+  }
+
+  async function saveToDrive() {
+    if (clientId()) { if (!loggedIn()) await login(); if (loggedIn()) await saveDrive(); return; }
+    const text = data.makeBundle(app.files);
+    if (isPhone()) {
+      try { await navigator.share({ files: [new File([text], data.BUNDLE_NAME, { type: 'application/json' })], title: 'Wealth Board' }); }
+      catch (e) { if (e.name === 'AbortError') { toast('Enregistrement annulé : rien n’a été marqué comme enregistré.'); return; } throw e; }
+      markSaved('drive');
+      toast('Choisissez « Enregistrer dans Drive » → dossier Wealth Board, puis supprimez l’ancienne copie.');
+      return;
+    }
+    // Computer without Google login: download, then replace the file in Drive (keeps one file, Drive keeps history).
+    data.downloadText(data.BUNDLE_NAME, text);
+    window.open(DRIVE_SEARCH, '_blank', 'noopener');
+    markSaved('drive');
+    showHelp('save');
+  }
+
+  function openFromDrive() {
+    if (clientId()) { (loggedIn() ? Promise.resolve() : login()).then(() => loggedIn() && openDrive()); return; }
+    if (isPhone()) { dialog.querySelector('[data-open]').click(); return; } // the phone picker lists Google Drive
+    showHelp('open');
+  }
+
+  function showHelp(kind) {
+    const el = dialog.querySelector('.drive-help');
+    if (!el) return;
+    el.hidden = false;
+    el.innerHTML = kind === 'open'
+      ? `<strong>Ouvrir depuis Google Drive sur ordinateur :</strong> ouvrez <a href="${DRIVE_SEARCH}" target="_blank" rel="noopener">${data.BUNDLE_NAME} dans Drive</a>
+         → Télécharger, puis « Fichier local… » ci-dessous. Avec Google Drive pour ordinateur, « Fichier local… » peut aussi le prendre directement dans le lecteur Google Drive.`
+      : `<strong>Dernière étape dans l’onglet Drive qui vient de s’ouvrir :</strong> clic droit sur ${data.BUNDLE_NAME} → Informations sur le fichier → <em>Gérer les versions</em>
+         → Importer une nouvelle version → le fichier téléchargé. (Première fois : glissez simplement le fichier dans Drive.)`;
   }
 
   // ------------------------------------------------------------------ window
@@ -123,19 +158,20 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
       <p>${isSample() ? 'Affiché : <strong>données d’exemple</strong>.'
         : `Affiché : portefeuille rév. ${app.files.portfolio.revision}${m.name ? ` · ouvert depuis ${esc(m.name)} le ${when(m.opened_at)}` : ''}${m.saved_at ? ` · enregistré le ${when(m.saved_at)}` : ''}.`}
         ${unsaved() ? '<br><strong>Modifications non enregistrées sur Drive.</strong>' : ''}</p>
-      ${clientId() ? `<section class="drive-login"><h3>Connexion Google Drive (ordinateur, optionnelle)</h3>
-        ${loggedIn()
-          ? `<div class="data-steps"><button type="button" class="primary" data-d="open">Ouvrir depuis Drive (connecté)</button>
-             <button type="button" class="primary" data-d="save">Enregistrer sur Drive (remplace le fichier)</button></div>`
-          : '<div class="data-steps"><button type="button" data-d="login">Se connecter à Google Drive</button></div>'}
-        </section><h3>Sans connexion (téléphone)</h3>` : ''}
+      <h3>Ouvrir</h3>
       <div class="data-steps">
-        <label class="button-like primary-like">1. Ouvrir depuis Drive…<input type="file" accept=".json,application/json" multiple data-open hidden></label>
-        <button type="button" class="primary" data-save>2. Enregistrer sur Drive${share ? ' (partager)' : ' (télécharger)'}</button>
+        <button type="button" class="primary" data-open-drive>Depuis Google Drive${clientId() && !loggedIn() ? ' (connexion)' : ''}</button>
+        <label class="button-like">Fichier local…<input type="file" accept=".json,application/json" multiple data-open hidden></label>
       </div>
-      <p class="sub">${share
-        ? 'Ouvrir : choisissez Google Drive dans le sélecteur. Enregistrer : dans le menu de partage, « Enregistrer dans Drive », dossier Wealth Board. Supprimez ensuite l’ancienne copie pour n’en garder qu’une.'
-        : 'Enregistrer télécharge le fichier : déposez-le dans votre dossier Drive (Google Drive pour ordinateur ou drive.google.com) en remplaçant l’ancien.'}</p>
+      <h3>Enregistrer</h3>
+      <div class="data-steps">
+        <button type="button" class="primary" data-save-drive>Sur Google Drive</button>
+        <button type="button" data-save-local>Fichier local (télécharger)</button>
+      </div>
+      <p class="sub drive-help" hidden></p>
+      <p class="sub">${clientId() ? 'Connecté à Google, le fichier est lu et remplacé directement dans Drive.'
+        : isPhone() ? 'Sur téléphone, Google Drive apparaît dans le sélecteur de fichiers et dans le menu de partage.'
+        : 'Sur ordinateur, sans connexion Google, le site ne peut pas lire Drive lui-même : une étape manuelle est expliquée au clic.'}</p>
       <h3>Éditeur de données</h3>
       <div class="data-steps"><button type="button" data-edit-json="lines">Ajouter des lignes (JSON)…</button>
         <button type="button" data-edit-json="full">Modifier le fichier complet…</button></div>
@@ -147,10 +183,9 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
       </details>
       <div class="dialog-actions"><button type="button" data-close>Fermer</button></div></form>`;
     dialog.querySelector('[data-open]').addEventListener('change', (e) => open(e.target.files));
-    dialog.querySelector('[data-d="login"]')?.addEventListener('click', login);
-    dialog.querySelector('[data-d="open"]')?.addEventListener('click', openDrive);
-    dialog.querySelector('[data-d="save"]')?.addEventListener('click', saveDrive);
-    dialog.querySelector('[data-save]').addEventListener('click', save);
+    dialog.querySelector('[data-open-drive]').addEventListener('click', openFromDrive);
+    dialog.querySelector('[data-save-drive]').addEventListener('click', () => saveToDrive().catch((e) => toast(e.message, 'error')));
+    dialog.querySelector('[data-save-local]').addEventListener('click', saveLocal);
     dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
     dialog.querySelectorAll('[data-edit-json]').forEach((b) => b.addEventListener('click', () => { dialog.close(); openEditor?.(b.dataset.editJson); }));
     dialog.querySelectorAll('[data-export]').forEach((b) => b.addEventListener('click', () => data.downloadJson(b.dataset.export, app.files[b.dataset.export])));
