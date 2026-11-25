@@ -29,19 +29,23 @@
     },
     "livret-a": {
       "value_cents": 1200000,
-      "cost_cents": 1200000
+      "cost_cents": 1200000,
+      "day_cents": 0
     },
     "livret-ldds": {
       "value_cents": 600000,
-      "cost_cents": 600000
+      "cost_cents": 600000,
+      "day_cents": 0
     },
     "swiss-savings": {
       "value_cents": 869565,
-      "cost_cents": 869565
+      "cost_cents": 869565,
+      "day_cents": 0
     },
     "home-cash-eur": {
       "value_cents": 80000,
-      "cost_cents": 80000
+      "cost_cents": 80000,
+      "day_cents": 0
     },
     "metal-napoleon-20f": {
       "value_cents": 179170,

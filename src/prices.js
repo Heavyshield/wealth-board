@@ -48,6 +48,24 @@ export function fxNeeded(portfolio, config) {
     .filter((c) => c && c !== base).sort();
 }
 
+// Metals: gold-api gives no previous close. The day / week / month % of the matching futures (Yahoo, via the
+// user's proxy) is applied to the spot price: prev_close = spot x futures prev / futures now (currency-free ratio).
+export const METAL_FUTURES = { XAU: 'GC=F', XAG: 'SI=F', XPT: 'PL=F', XPD: 'PA=F' };
+const FUT_MAX_GAP_H = 96; // ignore futures quotes too far from the spot time (weekend gap allowed)
+
+/** Spot price + previous / week / month closes scaled from the futures quote (pure, tested). */
+export function withFuturesHistory(spot, fut) {
+  if (!spot || !fut?.value || Math.abs(new Date(spot.as_of) - new Date(fut.as_of)) / 36e5 > FUT_MAX_GAP_H) return spot;
+  const scale = (c) => (typeof c === 'number' && c > 0 ? spot.value * (c / fut.value) : undefined);
+  const out = { ...spot };
+  for (const [k, v] of [['prev_close', fut.prev_close], ['close_1w', fut.close_1w], ['close_1m', fut.close_1m]]) {
+    const s = scale(v);
+    if (s !== undefined) out[k] = s;
+  }
+  if (out.prev_close !== undefined) out.history_source = `Yahoo ${fut.symbol ?? 'futures'}`;
+  return out;
+}
+
 export function spotNeeded(portfolio) {
   return [...new Set(portfolio.holdings.filter((h) => h.metal).map((h) => h.metal.code))].sort();
 }
@@ -115,6 +133,9 @@ export async function refreshPrices(portfolio, config, ctx = {}) {
     const byId = Object.fromEntries(group.map((t) => [t.id, t]));
     await runChain('quote', group.map((t) => t.id), group[0].chain, (pid, id) => `${pid}:${byId[id].symbol(pid)}`);
   }
+  // Metal futures last (one extra proxy request), only when the proxy is set up.
+  const futures = spotNeeded(portfolio).map((m) => METAL_FUTURES[m]).filter(Boolean);
+  if (futures.length && settings.yahoo_proxy_url) await runChain('quote', futures, ['yahoo_proxy'], (pid, sym) => `${pid}:${sym}`);
   saveCache(cache, storage);
   return { live: liveFromCache(portfolio, config, cache), report, refreshed_at: stamp };
 }
@@ -123,7 +144,11 @@ export async function refreshPrices(portfolio, config, ctx = {}) {
 export function liveFromCache(portfolio, config, cache = loadCache()) {
   const fx = {}, spot = {}, quotes = {};
   for (const c of fxNeeded(portfolio, config)) if (cache.fx[c]) fx[c] = cache.fx[c];
-  for (const m of spotNeeded(portfolio)) if (cache.spot[m]) spot[m] = cache.spot[m];
+  for (const m of spotNeeded(portfolio)) {
+    if (!cache.spot[m]) continue;
+    const fut = cache.quote[`yahoo_proxy:${METAL_FUTURES[m]}`];
+    spot[m] = withFuturesHistory(cache.spot[m], fut && { ...fut, symbol: METAL_FUTURES[m] });
+  }
   for (const t of quoteTargets(portfolio, config)) {
     for (const pid of t.chain) {
       const q = cache.quote[`${pid}:${t.symbol(pid)}`];
@@ -157,7 +182,10 @@ export function mergeLive(portfolio, config, live) {
   p.market_snapshot.spot ??= {};
   for (const [code, s] of Object.entries(live.spot ?? {})) {
     const cur = p.market_snapshot.spot[code];
-    if (!cur || newer(s.as_of, cur.as_of)) p.market_snapshot.spot[code] = { value: s.value, currency: s.currency, per: s.per ?? 'oz', as_of: s.as_of, source: s.source, ...(s.prev_close ? { prev_close: s.prev_close } : {}) };
+    if (!cur || newer(s.as_of, cur.as_of)) {
+      p.market_snapshot.spot[code] = { value: s.value, currency: s.currency, per: s.per ?? 'oz', as_of: s.as_of, source: s.source,
+        ...(s.prev_close ? { prev_close: s.prev_close } : {}), ...(s.close_1w ? { close_1w: s.close_1w } : {}), ...(s.close_1m ? { close_1m: s.close_1m } : {}) };
+    }
   }
   const quotes = {};
   for (const h of p.holdings) {

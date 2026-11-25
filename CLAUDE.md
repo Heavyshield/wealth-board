@@ -121,6 +121,10 @@ to detect that a file changed under a local copy and asks the user instead of ov
    back), exchange-local days. Rows: `week_base` = qty x (price - close_1w) at today's FX (market move of what is held,
    trades ignored), `week_pct`, `month_pct`; live quotes only, else null. UI: "Plus gros mouvements de la semaine"
    card (src/top-moves.js, top 3 by |week_base|) and the "1 mois %" column. Needs the worker redeployed.
+8. Balances (`par`: accounts, cash) count in the day change at 0 € (they do not move) -> coverage ~ all but manual.
+   Metals: gold-api has no previous close, so `withFuturesHistory` applies the Yahoo futures move (GC=F, SI=F, PL=F,
+   PA=F via the proxy /quotes, cached as quote `yahoo_proxy:GC=F`) to the spot: prev / week / month = spot x
+   futures close / futures now. Ignored when the futures quote is > 96 h from the spot time.
 
 ## Charts (src/charts.js) -- rules followed
 - Chart.js 4.6.2 from cdnjs, `defer` + SRI sha512 in index.html. If it fails, a banner shows and tables still render.

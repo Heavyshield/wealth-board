@@ -47,6 +47,7 @@ def main():
             price, cur = D(h["manual_price"]["value"]), h["manual_price"].get("currency", h["currency"])
         elif kind == "par":
             price, cur = Decimal(1), h["currency"]
+            prev = price  # balances do not move: day change 0, counted in the coverage
         elif kind == "spot":
             s, m = spot[h["metal"]["code"]], h["metal"]
             per_oz = D(s["value"]) / TO_OZ[s["per"]]

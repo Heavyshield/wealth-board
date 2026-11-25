@@ -83,7 +83,7 @@ export function renderKpis(el, rows, config, history) {
       ${t.day === null
         ? '<span class="tile-value muted">indisponible</span><span class="kpi-sub">aucun cours du jour avec clôture veille</span>'
         : `<span class="tile-value ${sign(t.day)}">${fmt.signedMoney(t.day, base)}</span>
-           <span class="kpi-sub" title="Seules les lignes avec un cours à jour et une clôture de la veille comptent">calculée sur ${fmt.pct(t.day_coverage, { signed: false })} de la valeur</span>`}
+           <span class="kpi-sub" title="Comptent : les soldes (comptes, cash : 0 €) et les lignes avec un cours à jour et une clôture de la veille (actions, ETF, métaux)">calculée sur ${fmt.pct(t.day_coverage, { signed: false })} de la valeur</span>`}
     </div>
     <div class="tile freshness">
       <span class="kpi-label">Fraîcheur des prix (part de la valeur)</span>

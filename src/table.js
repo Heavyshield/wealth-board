@@ -48,7 +48,7 @@ export function ratioCell(r, k, label) {
 function ruleBadge(r) {
   const ev = r.rules;
   if (!ev || ev.status === 'na') return '<span class="sub">—</span>';
-  const lines = ev.results.map((x) => `${x.state === 'pass' ? '✓' : x.state === 'fail' ? '⚠' : '·'} ${x.rule.label}${x.value !== null ? ` (${fmt.number(x.value, 2)})` : ' : n/d'}`);
+  const lines = ev.results.map((x) => `${x.state === 'pass' ? '✓' : x.state === 'fail' ? (x.rule.severity === 'critical' ? '⛔' : '⚠') : '·'} ${x.rule.label}${x.value !== null ? ` (${fmt.number(x.value, 2)})` : ' : n/d'}`);
   if (ev.metrics_age_days !== null) lines.push(`Métriques : ${ev.metrics_age_days} j`);
   const icon = { ok: '✓', breach: '⚠', danger: '⛔', partial: '✓', unknown: '·', stale: '⏱' }[ev.status];
   return `<span class="rbadge rbadge-${ev.status}" title="${esc(lines.join(' · '))}"><span aria-hidden="true">${icon}</span> ${RULE_STATUS[ev.status].label}</span>`;

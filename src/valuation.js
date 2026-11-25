@@ -55,9 +55,10 @@ export function resolvePrice(h, pricing, market, config, now, quotes = {}) {
     if (!spot || !h.metal) return missing(h);
     const perOz = spot.value / TO_OZ[spot.per];
     const value = fineOz(h.metal) * perOz;
-    const prev_close = spot.prev_close ? fineOz(h.metal) * (spot.prev_close / TO_OZ[spot.per]) : undefined;
+    const unit = (c) => (c ? fineOz(h.metal) * (c / TO_OZ[spot.per]) : undefined);
     const status = ageHours(spot.as_of, now) > (stale.spot ?? 72) ? 'stale' : 'live';
-    return { value, prev_close, currency: spot.currency, as_of: spot.as_of, source: spot.source ?? 'spot', status };
+    return { value, prev_close: unit(spot.prev_close), close_1w: unit(spot.close_1w), close_1m: unit(spot.close_1m),
+      currency: spot.currency, as_of: spot.as_of, source: spot.source ?? 'spot', status };
   }
   // quote
   const p = quotes[h.id] ?? h.last_price;
@@ -115,8 +116,10 @@ export function valueHoldings({ portfolio, config, now = new Date(), quotes = {}
       pricing,
       price,
       region: regionOf(h, config, pricing),
-      // Day change: only from a fresh market price with a previous close; otherwise null (not 0).
-      day_base: !toFill && price.status === 'live' && price.prev_close ? fx.convert(h.quantity * (price.value - price.prev_close), price.currency) : null,
+      // Day change: balances (accounts, cash) do not move: 0 and covered. Market prices: only fresh ones with a
+      // previous close; otherwise null (not 0).
+      day_base: !toFill && price.status === 'balance' ? 0
+        : !toFill && price.status === 'live' && price.prev_close ? fx.convert(h.quantity * (price.value - price.prev_close), price.currency) : null,
       // Week / month: market move of the CURRENT quantity (trades in between ignored), today's FX; quote prices only.
       week_base: !toFill && price.status === 'live' && price.close_1w ? fx.convert(h.quantity * (price.value - price.close_1w), price.currency) : null,
       week_pct: price.status === 'live' && price.close_1w ? price.value / price.close_1w - 1 : null,

@@ -7,7 +7,7 @@ import * as ecb from '../src/providers/ecb.js';
 import * as gold from '../src/providers/goldapi.js';
 import * as yp from '../src/providers/yahoo-proxy.js';
 import worker from '../tools/yahoo-proxy-worker.js';
-import { refreshPrices, mergeLive, persistPrices, liveFromCache } from '../src/prices.js';
+import { refreshPrices, mergeLive, persistPrices, liveFromCache, withFuturesHistory } from '../src/prices.js';
 import { topMoves } from '../src/top-moves.js';
 
 const fx = async (name) => (await fetch(`./fixtures/${name}`, { cache: 'no-store' })).json();
@@ -67,6 +67,16 @@ export async function pricesTests({ test, assert, eq, files, schemas, validate, 
     assert(old.close_1w === undefined && old.close_1m === undefined, 'réponse 1 jour (ancien proxy) : pas de semaine / mois');
   });
 
+  await test('Métaux : variation jour / semaine / mois des contrats à terme appliquée au spot', () => {
+    const spot = { value: 35, currency: 'EUR', per: 'oz', as_of: '2026-11-25T15:00:00Z', source: 'gold-api.com' };
+    const fut = { value: 40, prev_close: 38, close_1w: 32, close_1m: 50, as_of: '2026-11-25T14:55:00Z', symbol: 'SI=F' };
+    const s = withFuturesHistory(spot, fut);
+    eq(s.prev_close, 35 * 38 / 40, 'veille = spot x (veille / cours) du contrat');
+    eq(s.close_1w, 28, 'semaine'); eq(s.close_1m, 43.75, 'mois'); eq(s.history_source, 'Yahoo SI=F', 'source');
+    eq(withFuturesHistory(spot, { ...fut, as_of: '2026-11-15T00:00:00Z' }), spot, 'contrat trop ancien : ignoré');
+    eq(withFuturesHistory(spot, undefined), spot, 'pas de contrat : spot inchangé');
+  });
+
   await test('Plus gros mouvements : 3 plus grandes variations en euros, hausse ou baisse, hors patrimoine exclu', () => {
     const row = (id, week_base, in_total) => ({ id, week_base, ...(in_total === false ? { in_total } : {}) });
     const top = topMoves([row('a', 120), row('b', -900), row('c', null), row('d', 450), row('e', 50), row('f', -2000, false), row('g', 0)]);
@@ -124,7 +134,9 @@ export async function pricesTests({ test, assert, eq, files, schemas, validate, 
     assert(!live.quotes['cto-sample-corp'], 'AAPL inconnu ici : pas de cours inventé');
     assert(report.find((r) => r.provider === 'yahoo_proxy').errors.AAPL, 'erreur AAPL remontée');
     assert(live.fx.CHF && live.spot.XAU, 'change + métaux');
-    eq(calls.filter((u) => u.startsWith('https://proxy.test')).length, 1, 'une seule requête pour toutes les actions');
+    const stockCalls = calls.filter((u) => u.startsWith('https://proxy.test') && !u.includes('%3DF'));
+    eq(stockCalls.length, 1, 'une seule requête pour toutes les actions');
+    assert(calls.some((u) => u.startsWith('https://proxy.test') && u.includes('GC%3DF')), 'contrats à terme métaux demandés (1 requête de plus)');
   });
 
   await test('Proxy en panne : erreur remontée pour chaque ligne, aucun cours', async () => {
@@ -159,7 +171,7 @@ export async function pricesTests({ test, assert, eq, files, schemas, validate, 
     for (let i = 0; i < 21; i++) p.holdings.push({ ...structuredClone(base), id: `eq-${i}`, ticker: `EQ${i}.PA` });
     let sleeps = 0; calls.length = 0;
     await refreshPrices(p, config, { fetch: net, storage: memoryStorage(), settings, now: NOW, sleep: async () => { sleeps++; } });
-    eq(calls.filter((u) => u.startsWith('https://proxy.test')).length, 2, 'requêtes'); eq(sleeps, 0, 'pauses');
+    eq(calls.filter((u) => u.startsWith('https://proxy.test') && !u.includes('%3DF')).length, 2, 'requêtes'); eq(sleeps, 0, 'pauses');
   });
 
   await test('Fusion : le plus récent gagne ; prix manuel jamais écrasé', () => {
