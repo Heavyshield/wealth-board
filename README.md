@@ -60,10 +60,27 @@ Yahoo bloque les appels directs depuis une page web ; ce petit relais tourne sur
 Origines autorisées par défaut : `https://heavyshield.github.io` et `http://localhost:8770`.
 Pour en changer : Worker → Settings → Variables → `ALLOWED_ORIGINS` (liste séparée par des virgules).
 
+### Mettre à jour le proxy (nouvelle version avec recherche par ISIN)
+Cloudflare → Workers & Pages → `wealth-quotes` → **Edit code** → remplacer tout par le contenu actuel de
+[`tools/yahoo-proxy-worker.js`](tools/yahoo-proxy-worker.js) → **Deploy**. L'adresse ne change pas.
+
+### Compléter les tickers automatiquement
+Ligne des cours → « N ligne(s) sans ticker · Compléter » : le proxy cherche la cotation Yahoo à partir de l'ISIN
+(Paris en priorité, ordre réglable dans `config.json → providers.preferred_exchanges`). Vérifiez la place proposée,
+décochez si besoin, ou choisissez « Autre… » pour saisir un ticker → **Appliquer**.
+
 ### Symboles
 Le champ `ticker` d'une ligne sert pour toutes les sources (format Yahoo : `TTE.PA`, `VOLV-B.ST`, `EQNR.OL`,
 `NOVO-B.CO`, `NESN.SW`, `CW8.PA`, `AAPL`). Ne jamais chercher de cours pour une ligne :
 `"price_source": "manual"` (ou renseigner `manual_price`).
+
+## Ajouter ou modifier des lignes
+- **+ Ajouter une ligne** (au-dessus du tableau) : actions, ETF, fonds, livrets, comptes en devise, espèces, métaux
+  (poids, unité, pureté : valorisés au poids fin × cours spot).
+- **✎** à côté d'un nom : modifier tous les champs ou **supprimer** la ligne (elle reste dans le journal).
+- **Modifier les versements** (carte « Plafond de versements PEA ») : total versé, date, ouverture.
+- **Retirer les données d'exemple** (bandeau jaune) : enlève les lignes et l'historique fictifs, garde vos lignes.
+  Pensez ensuite à ajuster budget, cibles et règles dans `config.json`.
 
 ## Importer les positions Boursorama
 1. Boursorama → votre compte (PEA ou CTO) → onglet **Positions** → **Exporter en CSV** (un compte par fichier).

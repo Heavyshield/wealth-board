@@ -41,7 +41,7 @@ function columns(ctx) {
   const signCls = (v) => (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
   return [
     { id: 'name', label: 'Ligne', sort: (r) => r.h.name.toLowerCase(), always: true,
-      cell: (r) => `<span class="name">${esc(r.h.name)}</span><span class="sub">${esc([r.h.ticker, r.h.isin].filter(Boolean).join(' · '))}</span>` },
+      cell: (r) => `<span class="name-row"><span class="name">${esc(r.h.name)}</span><button type="button" class="row-edit" data-row-edit="${esc(r.id)}" aria-label="Modifier ${esc(r.h.name)}" title="Modifier la ligne">✎</button></span><span class="sub">${esc([r.h.ticker, r.h.isin].filter(Boolean).join(' · '))}</span>` },
     { id: 'envelope', label: 'Enveloppe', sort: (r) => envLabel(r.h.envelope), cell: (r) => esc(envLabel(r.h.envelope)) },
     { id: 'asset_class', label: 'Classe', sort: (r) => classLabel(r.h.asset_class), cell: (r) => esc(classLabel(r.h.asset_class)) },
     { id: 'currency', label: 'Devise', sort: (r) => r.h.currency, cell: (r) => esc(r.h.currency) },
@@ -82,7 +82,9 @@ function columns(ctx) {
 }
 
 export class HoldingsTable {
-  constructor(root, { onEditsChange }) {
+  constructor(root, { onEditsChange, onRowEdit, onAdd }) {
+    this.onRowEdit = onRowEdit;
+    this.onAdd = onAdd;
     this.root = root;
     this.onEditsChange = onEditsChange;
     this.state = { sort: { key: 'value_base', dir: -1 }, search: '', filters: {}, editMode: false };
@@ -185,6 +187,7 @@ export class HoldingsTable {
         <div class="filters">${this.filterControls()}</div>
         <div class="table-actions">
           <details class="col-picker"><summary>Colonnes</summary><div class="col-list">${picker}</div></details>
+          <button type="button" data-action="add">+ Ajouter une ligne</button>
           <button type="button" data-action="toggle-edit" aria-pressed="${editing}">${editing ? 'Terminer l\'édition' : 'Éditer'}</button>
           ${pending ? `<span class="pending">${pending} modification${pending > 1 ? 's' : ''}</span>
             <button type="button" class="primary" data-action="save">Enregistrer</button>
@@ -221,11 +224,13 @@ export class HoldingsTable {
       this.root.querySelector('.col-picker').open = true;
     }));
     $('[data-edit]').forEach((i) => i.addEventListener('change', () => this.recordEdit(i)));
+    $('[data-row-edit]').forEach((b) => b.addEventListener('click', () => this.onRowEdit?.(b.dataset.rowEdit)));
     $('[data-action]').forEach((b) => b.addEventListener('click', () => {
       const a = b.dataset.action;
       if (a === 'toggle-edit') { this.state.editMode = !this.state.editMode; this.render(); }
       if (a === 'discard') { this.edits = {}; this.render(); this.onEditsChange?.('discard'); }
       if (a === 'save') this.onEditsChange?.('save', this.edits);
+      if (a === 'add') this.onAdd?.();
     }));
   }
 

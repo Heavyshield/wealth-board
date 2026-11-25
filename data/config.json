@@ -55,6 +55,11 @@
       "pricing": "quote"
     },
     {
+      "id": "fund",
+      "label": "Fonds",
+      "pricing": "quote"
+    },
+    {
       "id": "metal",
       "label": "Métaux",
       "pricing": "spot"
@@ -249,7 +254,25 @@
       "spot": 15,
       "fx": 360
     },
-    "auto_refresh": true
+    "auto_refresh": true,
+    "preferred_exchanges": [
+      "PAR",
+      "AMS",
+      "BRU",
+      "LIS",
+      "MIL",
+      "GER",
+      "FRA",
+      "STO",
+      "OSL",
+      "CPH",
+      "HEL",
+      "EBS",
+      "LSE",
+      "NYQ",
+      "NMS",
+      "PCX"
+    ]
   },
   "imports": {
     "boursorama": {

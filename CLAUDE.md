@@ -10,6 +10,8 @@ Footer must always read: "Outil de suivi, pas un conseil en investissement."
 - [x] (c) rules engine (config.rules), constraint meters (config.constraints), "À revoir" panel, editable metrics
 - [x] (d) price providers: FX (Frankfurter > ECB), metals (gold-api), quotes (own Yahoo proxy), cache, fallback
 - [x] (e) CSV position import (Boursorama profile) with column mapping, diff preview, per-line apply
+- [x] (e+) editing: ticker assistant (ISIN -> Yahoo via proxy /search), line editor (add/edit/delete any class),
+  PEA contributions editor, "Retirer les données d'exemple"
 - [ ] (f) Google Drive sync (GIS, drive.file) + File System Access fallback + conflicts
 - [ ] (g) "Export for Claude" + snapshot button
 
@@ -31,6 +33,7 @@ tools/yahoo-proxy-worker.js  Cloudflare Worker the user deploys (Yahoo has no CO
 tests/prices.test.js + tests/fixtures/*.json  real API responses captured 2026-11-25
 src/csv.js          tolerant CSV: UTF-8/BOM or Windows-1252, ; , tab, RFC 4180 quotes, FR/EN numbers
 src/importer.js     column mapping via config.imports, diff vs one envelope, applyImport (changelog per change)
+src/editors.js      dialogs: ticker assistant, line editor, account (contributions) editor -- all via data.js
 src/import-ui.js    "Importer CSV" dialog: format, envelope, file -> mapping + diff with checkboxes -> apply
 tests/import.test.js + tests/fixtures/boursorama-fake-*.csv  FAKE exports (EN/FR headers, cp1252, missing column)
 src/format.js       fr-FR formatting + parsing of typed numbers
@@ -112,6 +115,9 @@ to detect that a file changed under a local copy and asks the user instead of ov
   Add a changelog entry (`author: "claude"`), bump `revision` and `updated_at`.
 - **Add an asset class / envelope**: add to `config.asset_classes` / `config.envelopes` (pick `pricing`).
 - **Add a rule**: append to `config.rules.items` (any metric name); add that metric + `as_of` to the holdings' `metrics`.
+- **Edit data in the UI**: ✎ on a row (line editor), "+ Ajouter une ligne", "Modifier les versements" on the PEA card,
+  "N ligne(s) sans ticker · Compléter" in the price line. data.js: addHolding / removeHolding / setAccount /
+  removeSampleData / applyEdits (dotted paths, objects compared by value, null removes a field).
 - **Import a new CSV format** (other broker): add a profile to `config.imports` (`columns` aliases per field,
   `required`, `update_fields`, `envelope_default`); test with a FAKE file in tests/fixtures (only CSVs allowed there).
 - **Add a constraint**: append to `config.constraints` with one of the 3 types above.
@@ -137,7 +143,7 @@ to detect that a file changed under a local copy and asks the user instead of ov
 
 ## CSV import (src/importer.js)
 - Real Boursorama export format is not publicly documented (checked 2026-11-25): "Positions" tab -> "Exporter en CSV",
-  one account per file, name `export-positions-comptables-dd-MM-yyyy_hh-mm-ss.csv`. Columns are matched by alias
+  one account per file, name `export-positions-(comptables|instantanees)-dd-MM-yyyy_hh-mm-ss.csv` (verified on a real export 2026-11-25: mapping OK, 10 positions, fractional quantities). Columns are matched by alias
   (`config.imports.boursorama.columns`, case/accent-insensitive); the dialog shows the mapping found. If a column is
   not recognised, add its exact header to the aliases -- never hardcode in JS.
 - Diff is per envelope and only for quote-priced classes (cash/accounts/metals untouched). Match by ISIN, then name.
@@ -156,6 +162,10 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - `mergeLive`: newest `as_of` wins between live cache and file (so prices Claude writes are not overwritten by older
   cache). FX block takes the oldest live as_of (conservative). "Mémoriser les cours" writes them into the file
   (last_price + market_snapshot, revision+1, one changelog entry `field: "prices"`).
+- Ticker assistant: proxy `GET /search?isins=` (Yahoo search, cached 24 h at the edge) -> listings; best = first in
+  `config.providers.preferred_exchanges`; quoteType EQUITY/ETF/MUTUALFUND suggests class equity/etf/fund. The user
+  confirms each line (some ETFs resolve to a listing in another currency, e.g. IWDA.L in USD). Search fixtures use
+  PUBLIC example ISINs only, never the user's holdings (public repo).
 - Yahoo `chartPreviousClose` (range=1d) = close before the current session -> base for day change. GBp/GBX/ZAc/ILA are
   converted to major units. gold-api has no previous close: metals have no day change (shown as coverage, not 0).
 

@@ -9,6 +9,7 @@ import { evaluateRules, evaluateConstraints, reviewItems } from './rules.js';
 import { renderReview, renderConstraints } from './review.js';
 import * as prices from './prices.js';
 import { initImport } from './import-ui.js';
+import { createEditors } from './editors.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -79,7 +80,7 @@ function render() {
   app.rows = rows;
   const constraints = evaluateConstraints(rows, portfolio, config);
   renderReview($('#review'), reviewItems(rows, constraints, config, fmt), { onSelect: focusTarget });
-  renderConstraints($('#constraints'), constraints);
+  renderConstraints($('#constraints'), constraints, { onEditAccount: (env) => app.editors.openAccount(env) });
   $('#sample-banner').hidden = !portfolio.sample_data;
   $('#rev').textContent = `portfolio rév. ${portfolio.revision}${data.hasWorking('portfolio') ? ' · copie locale' : ''}`;
   viz.renderKpis($('#summary'), rows, config, app.files.history);
@@ -93,6 +94,8 @@ function renderPriceStatus(progress) {
   const el = $('#price-status');
   const rep = app.report;
   const live = Object.keys(app.merged?.quotes ?? {}).length;
+  const quoteIds = new Set(app.files.config.asset_classes.filter((c) => c.pricing === 'quote').map((c) => c.id));
+  const noTicker = app.files.portfolio.holdings.filter((h) => quoteIds.has(h.asset_class) && !h.ticker && !h.manual_price && h.price_source !== 'manual').length;
   const errs = (rep ?? []).flatMap((r) => Object.entries(r.errors).map(([k, m]) => ({ p: prices.PROVIDERS[r.provider]?.label ?? r.provider, k, m })));
   const lines = (rep ?? []).map((r) => {
     const label = prices.PROVIDERS[r.provider]?.label ?? r.provider;
@@ -109,8 +112,10 @@ function renderPriceStatus(progress) {
       <ul>${lines}</ul>
       ${errs.length ? `<ul class="ps-errors">${errs.slice(0, 30).map((e) => `<li><code>${esc(e.k)}</code> (${esc(e.p)}) : ${esc(e.m)}</li>`).join('')}</ul>` : ''}
     </details>` : ''}
+    ${noTicker ? `<button type="button" id="fill-tickers">${noTicker} ligne(s) sans ticker · Compléter</button>` : ''}
     ${live || Object.keys(app.live.fx).length || Object.keys(app.live.spot).length ? '<button type="button" id="persist-prices" title="Écrire ces cours dans portfolio.json (copie locale) pour Claude et les autres appareils">Mémoriser les cours</button>' : ''}`;
   $('#persist-prices')?.addEventListener('click', persistPrices);
+  $('#fill-tickers')?.addEventListener('click', () => app.editors.openTickers());
 }
 
 async function refreshPrices(force) {
@@ -126,6 +131,33 @@ async function refreshPrices(force) {
   } finally {
     app.refreshing = false;
     $('#refresh').disabled = false;
+    render();
+  }
+}
+
+/** Validate + save a new portfolio from any editor. Returns true on success. */
+function commitPortfolio(next, message, { refreshPrices: refresh = false } = {}) {
+  const errs = data.validateAll({ ...app.files, portfolio: next }, app.schemas);
+  if (errs.portfolio) { toast(`Refusé : ${errs.portfolio[0].path} : ${errs.portfolio[0].message}`, 'error'); return false; }
+  data.saveWorking('portfolio', next, app.source.portfolio.revision);
+  app.files.portfolio = next;
+  render();
+  toast(`${message} (rév. ${next.revision})`);
+  if (refresh) refreshPrices(false);
+  return true;
+}
+
+function removeSample() {
+  const sample = app.source.portfolio;
+  const n = app.files.portfolio.holdings.filter((h) => sample.holdings.some((s) => s.id === h.id)).length;
+  const msg = `Retirer les ${n} lignes d'exemple, les versements d'exemple et l'historique d'exemple ?\n`
+    + 'Vos lignes importées ou ajoutées sont gardées. Le budget, les cibles et les règles (config.json) restent à ajuster.';
+  if (!confirm(msg)) return;
+  if (!commitPortfolio(data.removeSampleData(app.files.portfolio, sample, 'user'), `${n} lignes d'exemple retirées`)) return;
+  if (app.files.history.sample_data) {
+    const h = { ...structuredClone(app.files.history), sample_data: false, snapshots: [], revision: app.files.history.revision + 1, updated_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z') };
+    data.saveWorking('history', h, app.source.history.revision);
+    app.files.history = h;
     render();
   }
 }
@@ -223,7 +255,7 @@ async function main() {
     showErrors(errs);
     if (errs.portfolio || errs.config) return; // cannot value safely
     showConflicts(loaded.conflicts);
-    app.table = new HoldingsTable($('#holdings'), { onEditsChange: onEdits });
+    app.table = new HoldingsTable($('#holdings'), { onEditsChange: onEdits, onRowEdit: (id) => app.editors.openLine(id), onAdd: () => app.editors.openLine(null) });
     viz.configureChartDefaults();
     document.querySelectorAll('[data-group]').forEach((b) => b.addEventListener('click', () => {
       app.grouping = b.dataset.group;
@@ -239,6 +271,8 @@ async function main() {
       })));
     if (unknown.length) showErrors({ config: unknown });
     initSettings();
+    app.editors = createEditors({ dialog: $('#editor'), getState: () => ({ portfolio: app.files.portfolio, config: app.files.config }), commit: commitPortfolio });
+    $('#remove-sample').addEventListener('click', removeSample);
     initImport({
       dialog: $('#import'),
       openButton: $('#open-import'),

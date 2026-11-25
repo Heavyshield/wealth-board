@@ -21,6 +21,42 @@ export function parseChart(body) {
   };
 }
 
+/** Parse a Yahoo search response -> [{ symbol, exchange, exchange_name, type, name }]. Mirrors the worker. */
+export function parseSearch(body) {
+  return (body?.quotes ?? [])
+    .filter((q) => q.symbol && q.isYahooFinance !== false)
+    .map((q) => ({ symbol: q.symbol, exchange: q.exchange ?? '', exchange_name: q.exchDisp ?? q.exchange ?? '', type: q.quoteType ?? '', name: q.longname ?? q.shortname ?? '' }));
+}
+
+/**
+ * Pick the best listing: first by config preferred exchanges order, then Yahoo's own order.
+ * Returns { pick, candidates } (pick may be undefined).
+ */
+export function bestListing(candidates, preferred = []) {
+  const rank = (c) => { const i = preferred.indexOf(c.exchange); return i < 0 ? preferred.length : i; };
+  const sorted = [...candidates].sort((a, b) => rank(a) - rank(b));
+  return { pick: sorted[0], candidates: sorted };
+}
+
+/** Yahoo quoteType -> suggested asset class id (only if that class exists in config). */
+export const TYPE_TO_CLASS = { EQUITY: 'equity', ETF: 'etf', MUTUALFUND: 'fund' };
+
+/** Ask the proxy for listings of up to 20 ISINs per request. Returns { results: {ISIN: [..]}, errors }. */
+export async function searchIsins(isins, ctx) {
+  const base = ctx.settings.yahoo_proxy_url?.replace(/\/+$/, '');
+  if (!base) throw new ProviderError('URL du proxy absente (Réglages)');
+  const results = {}, errors = {};
+  for (let i = 0; i < isins.length; i += 20) {
+    const chunk = isins.slice(i, i + 20);
+    const { body, status } = await getJson(ctx, `${base}/search?isins=${chunk.join(',')}`, { timeoutMs: 20000 });
+    if (status === 404) throw new ProviderError('le proxy ne connaît pas /search : recopiez la dernière version de tools/yahoo-proxy-worker.js dans Cloudflare');
+    if (status === 403) throw new ProviderError('proxy : origine refusée');
+    if (!body?.results) throw new ProviderError(body?.error ?? 'réponse du proxy inattendue');
+    Object.assign(results, body.results); Object.assign(errors, body.errors ?? {});
+  }
+  return { results, errors };
+}
+
 /** Parse the proxy response: { quotes: { SYM: Price }, errors: { SYM: msg } }. */
 export function parseProxy(body, symbols) {
   if (!body || typeof body !== 'object' || !body.quotes) throw new ProviderError(body?.error ?? 'réponse du proxy inattendue');

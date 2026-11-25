@@ -8,6 +8,7 @@ import { valueHoldings, totals } from '../src/valuation.js';
 import * as fmt from '../src/format.js';
 import { pricesTests } from './prices.test.js';
 import { importTests } from './import.test.js';
+import { editingTests } from './editing.test.js';
 import { evaluateRules, evaluateHolding, evaluateConstraints, reviewItems } from '../src/rules.js';
 
 const results = [];
@@ -236,6 +237,9 @@ await pricesTests({ test, assert, eq, files, schemas, validate, NOW });
 
 // ---------------------------------------------------------------- stage e: CSV import
 await importTests({ test, assert, eq, files, schemas, validate, NOW });
+
+// ---------------------------------------------------------------- tickers + editing
+await editingTests({ test, assert, eq, files, schemas, validate, NOW });
 
 const failed = results.filter((r) => !r.ok);
 window.testResults = { pass: results.length - failed.length, fail: failed.length, results };

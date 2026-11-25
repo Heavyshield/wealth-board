@@ -43,7 +43,7 @@ function meter(ratio, cls, markers = []) {
   return `<div class="meter meter-${cls}"><span class="meter-fill" style="width:${pct}%"></span>${markers.map((m) => `<span class="meter-mark" style="left:${Math.min(100, m.at * 100)}%" title="${esc(m.label)}"></span>`).join('')}</div>`;
 }
 
-export function renderConstraints(el, results) {
+export function renderConstraints(el, results, { onEditAccount } = {}) {
   if (!results.length) { el.hidden = true; return; }
   el.hidden = false;
   el.innerHTML = results.map((c) => {
@@ -73,6 +73,8 @@ export function renderConstraints(el, results) {
         ${(() => { const scale = Math.max(1.25, c.ratio * 1.05); return meter(c.ratio / scale, s.cls, [{ at: 1 / scale, label: 'objectif' }]); })()}
         <span class="kpi-sub">${c.value >= c.need ? `Excédent : ${fmt.money(c.value - c.need, c.base, { digits: 0 })}` : `Manque : ${fmt.money(c.need - c.value, c.base, { digits: 0 })}`}</span>`;
     }
-    return `<article class="tile constraint" id="constraint-${esc(c.id)}"><div class="constraint-head"><span class="kpi-label">${esc(c.label)}</span>${badge}</div>${body}</article>`;
+    const edit = c.type === 'contribution_ceiling' ? `<button type="button" class="linklike small" data-edit-account="${esc(c.envelope)}">Modifier les versements</button>` : '';
+    return `<article class="tile constraint" id="constraint-${esc(c.id)}"><div class="constraint-head"><span class="kpi-label">${esc(c.label)}</span>${badge}</div>${body}${edit}</article>`;
   }).join('');
+  el.querySelectorAll('[data-edit-account]').forEach((b) => b.addEventListener('click', () => onEditAccount?.(b.dataset.editAccount)));
 }

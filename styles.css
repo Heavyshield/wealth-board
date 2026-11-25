@@ -138,6 +138,21 @@ table.diff td:first-child { width: 28px; }
 del { color: var(--muted); } ins { text-decoration: none; font-weight: 600; }
 .import-result .errors { margin-top: 8px; }
 
+/* Editors */
+.name-row { display: flex; align-items: center; gap: 6px; }
+.row-edit { border: 0; background: none; padding: 0 4px; color: var(--muted); font-size: .95rem; line-height: 1; }
+.row-edit:hover { color: var(--accent); }
+.ed-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 12px; }
+.ed-grid .wide { grid-column: 1 / -1; }
+.ed-grid fieldset { border: 1px solid var(--border); border-radius: var(--radius); display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 12px; margin: 8px 0; }
+.ed-grid fieldset[hidden], .field[hidden] { display: none; }
+.editor select, .editor input { width: 100%; }
+.editor td select { margin-bottom: 4px; }
+.editor .sub input { width: auto; }
+button.danger { color: var(--missing); border-color: var(--missing); margin-right: auto; }
+.linklike.small { font-size: .85rem; font-weight: 500; margin-top: 6px; }
+#remove-sample { margin-left: 8px; }
+
 /* Chart cards */
 .viz { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .card h2 { margin: 0; font-size: 1rem; }

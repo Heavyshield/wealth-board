@@ -76,11 +76,11 @@ export function evaluateConstraints(rows, portfolio, config) {
     const out = { id: c.id, label: c.label, type: c.type, base };
     if (c.type === 'contribution_ceiling') {
       const acct = (portfolio.accounts ?? []).find((a) => a.envelope === c.envelope);
-      if (!acct || acct.contributions === undefined) return { ...out, state: 'missing', ratio: 0, note: `Versements de « ${c.envelope} » non renseignés (portfolio.accounts).` };
+      if (!acct || acct.contributions === undefined) return { ...out, envelope: c.envelope, state: 'missing', ratio: 0, note: `Versements de « ${c.envelope} » non renseignés (portfolio.accounts).` };
       const ratio = acct.contributions / c.ceiling;
       const envValue = rows.filter((r) => r.h.envelope === c.envelope).reduce((a, r) => a + (r.value_base ?? 0), 0);
       return {
-        ...out, ratio, value: acct.contributions, limit: c.ceiling, remaining: c.ceiling - acct.contributions,
+        ...out, envelope: c.envelope, ratio, value: acct.contributions, limit: c.ceiling, remaining: c.ceiling - acct.contributions,
         as_of: acct.as_of, envelope_value: envValue,
         state: ratio > 1 ? 'breach' : ratio >= (c.warn_ratio ?? 0.9) ? 'warn' : 'ok',
       };

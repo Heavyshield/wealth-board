@@ -141,7 +141,7 @@ export function applyEdits(portfolio, edits, author = 'user', now = new Date()) 
     if (!h) continue;
     for (const [field, value] of Object.entries(fields)) {
       const old = getPath(h, field) ?? null;
-      if (old === value) continue;
+      if (JSON.stringify(old) === JSON.stringify(value ?? null)) continue; // objects (metal, manual_price) compared by value
       next.changelog.push({ date, file: 'portfolio', target: id, field, old, new: value, author });
       setPath(h, field, value);
       h.updated_at = date;
@@ -151,6 +151,64 @@ export function applyEdits(portfolio, edits, author = 'user', now = new Date()) 
   next.revision = portfolio.revision + 1;
   next.updated_at = date;
   return next;
+}
+
+const stamp = (now) => now.toISOString().replace(/\.\d{3}Z$/, 'Z');
+const bump = (next, prev, date) => { next.revision = prev.revision + 1; next.updated_at = date; return next; };
+
+/** Add a holding (id must be unique). Returns a NEW portfolio. */
+export function addHolding(portfolio, holding, author = 'user', now = new Date()) {
+  const date = stamp(now);
+  const next = structuredClone(portfolio);
+  if (next.holdings.some((h) => h.id === holding.id)) throw new Error(`id déjà utilisé : ${holding.id}`);
+  next.holdings.push({ ...holding, updated_at: date });
+  next.changelog.push({ date, file: 'portfolio', target: holding.id, field: 'holding', old: null, new: 'ajout', author });
+  return bump(next, portfolio, date);
+}
+
+/** Remove a holding; the full line is kept in the changelog (`old`). Returns a NEW portfolio. */
+export function removeHolding(portfolio, id, author = 'user', now = new Date()) {
+  const date = stamp(now);
+  const next = structuredClone(portfolio);
+  const h = next.holdings.find((x) => x.id === id);
+  if (!h) return portfolio;
+  next.holdings = next.holdings.filter((x) => x.id !== id);
+  next.changelog.push({ date, file: 'portfolio', target: id, field: 'holding', old: h, new: 'suppression', author });
+  return bump(next, portfolio, date);
+}
+
+/** Create or update the facts of one envelope (portfolio.accounts). Returns a NEW portfolio. */
+export function setAccount(portfolio, envelope, fields, author = 'user', now = new Date()) {
+  const date = stamp(now);
+  const next = structuredClone(portfolio);
+  next.accounts ??= [];
+  let acct = next.accounts.find((a) => a.envelope === envelope);
+  if (!acct) { acct = { envelope, as_of: fields.as_of ?? date.slice(0, 10) }; next.accounts.push(acct); }
+  for (const [k, v] of Object.entries(fields)) {
+    if (JSON.stringify(acct[k] ?? null) === JSON.stringify(v ?? null)) continue;
+    next.changelog.push({ date, file: 'portfolio', target: `account:${envelope}`, field: k, old: acct[k] ?? null, new: v ?? null, author });
+    if (v === null || v === undefined) delete acct[k]; else acct[k] = v;
+  }
+  return bump(next, portfolio, date);
+}
+
+/**
+ * Remove the sample lines shipped in the repo (ids of `sample.holdings`) and sample account facts,
+ * mark the file as real data. One changelog entry listing what was removed. Returns a NEW portfolio.
+ */
+export function removeSampleData(portfolio, sample, author = 'user', now = new Date()) {
+  const date = stamp(now);
+  const ids = new Set(sample.holdings.map((h) => h.id));
+  const next = structuredClone(portfolio);
+  const removed = next.holdings.filter((h) => ids.has(h.id)).map((h) => h.id);
+  next.holdings = next.holdings.filter((h) => !ids.has(h.id));
+  const sampleAccts = new Set((sample.accounts ?? []).map((a) => JSON.stringify(a)));
+  const acctRemoved = (next.accounts ?? []).filter((a) => sampleAccts.has(JSON.stringify(a))).map((a) => a.envelope);
+  next.accounts = (next.accounts ?? []).filter((a) => !sampleAccts.has(JSON.stringify(a)));
+  next.sample_data = false;
+  next.changelog.push({ date, file: 'portfolio', target: 'sample', field: 'holdings', old: removed, new: null, author,
+    note: `données d'exemple retirées (${removed.length} lignes${acctRemoved.length ? `, versements ${acctRemoved.join(', ')}` : ''})` });
+  return bump(next, portfolio, date);
 }
 
 /** Trigger a JSON download of a data file (export fallback, always available). */

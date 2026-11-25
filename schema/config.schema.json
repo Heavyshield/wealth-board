@@ -399,6 +399,13 @@
         },
         "auto_refresh": {
           "type": "boolean"
+        },
+        "preferred_exchanges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Yahoo exchange codes, best first, used to pick a listing from an ISIN"
         }
       }
     },
