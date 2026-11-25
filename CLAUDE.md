@@ -39,6 +39,7 @@ src/data-ui.js      "Données" window (open wealth-board.json / save it: share s
 src/gdrive.js       OPTIONAL desktop Google login: newest wealth-board.json, overwrite in place, trash old copies
 src/claude-export.js  makeSnapshot / addSnapshot / buildClaudeExport (pure)
 src/journal.js      changelog view, filter by author (Claude highlighted)
+src/metrics.js      "Ratios Yahoo": fetch PER, P/CF, net debt/EBITDA via proxy /metrics; manual values kept
 src/json-editor.js  Éditeur Données: paste lines/envelopes (merge by id) or edit the whole file; validate before apply
 src/import-ui.js    "Importer CSV" dialog: format, envelope, file -> mapping + diff with checkboxes -> apply
 tests/import.test.js + tests/fixtures/boursorama-fake-*.csv  FAKE exports (EN/FR headers, cp1252, missing column)
@@ -84,6 +85,12 @@ to detect that a file changed under a local copy and asks the user instead of ov
   > stale (older than metrics_max_age_days, info) > partial (some ratios n/d, the known ones pass) > ok; `na` = no rule.
   A ratio we cannot get is shown "n/d" and raises NO alert (user decision 2026-11-25: less info, not a problem).
   Ratio columns (PER, P/CF, DN/EBITDA) are visible by default (one-time migration wb.ui.ratios_v1).
+- Ratios from Yahoo ("Ratios Yahoo" button, proxy `GET /metrics?symbols=`, cookie + crumb handshake, cached 6 h at the
+  edge): per = trailingPE, or price / trailing EPS when EPS < 0 (Yahoo omits PER for loss-makers: computed so the
+  negative-PER rule still fires); pcf = market cap / operating cash flow, ONLY if price and accounts share a currency;
+  net_debt_ebitda = (total debt - total cash) / EBITDA, only if EBITDA > 0. Otherwise omitted (n/d) with the reason in
+  `metrics.notes`. Stored as `metrics { ..., as_of: today, source: "Yahoo", notes }`; metrics typed by the user
+  (source != "Yahoo") are never overwritten. Yahoo's debt figure may not include all leases (user's definition does).
   - `share_cap` `{group_by, keys[], max?, min?}` -> share of total value; breach above max, warn below min.
   - `runway` `{monthly_budget, target_months, liquid: scope}` -> months = liquid value / budget; warn < target, breach < half.
 - "À revoir" = rule breaches, missing/stale metrics, missing/stale prices, missing FX, constraints not OK,

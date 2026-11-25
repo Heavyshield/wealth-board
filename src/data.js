@@ -159,7 +159,7 @@ export function applyEdits(portfolio, edits, author = 'user', now = new Date()) 
       setPath(h, field, value);
       h.updated_at = date;
     }
-    if (h.metrics && Object.keys(h.metrics).every((k) => k === 'as_of' || k === 'source')) delete h.metrics; // no metric left
+    if (h.metrics && Object.keys(h.metrics).every((k) => ['as_of', 'source', 'notes'].includes(k)) && h.metrics.source !== 'Yahoo') delete h.metrics; // no metric left (a Yahoo attempt is kept: it records why ratios are n/d)
   }
   next.revision = portfolio.revision + 1;
   next.updated_at = date;

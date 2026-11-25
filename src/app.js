@@ -14,6 +14,7 @@ import { initDataUI } from './data-ui.js';
 import { makeSnapshot, addSnapshot, buildClaudeExport } from './claude-export.js';
 import { renderJournal } from './journal.js';
 import { createJsonEditor } from './json-editor.js';
+import { metricTargets, fetchMetrics, applyMetrics } from './metrics.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -179,6 +180,23 @@ async function exportForClaude() {
   }
 }
 
+// ---------------------------------------------------------------- ratios from Yahoo (proxy /metrics)
+async function fetchRatios() {
+  const targets = metricTargets(app.files.portfolio, app.files.config);
+  if (!targets.length) { toast('Aucune ligne avec ticker concernée par les règles (complétez les tickers d’abord).'); return; }
+  const todo = targets.filter((t) => !t.manual);
+  if (!todo.length) { toast('Toutes les lignes concernées ont des ratios saisis à la main : rien à récupérer.'); return; }
+  toast(`Ratios : interrogation de Yahoo pour ${todo.length} ligne(s)…`);
+  try {
+    const fetched = await fetchMetrics([...new Set(todo.map((t) => t.symbol))], { settings: prices.loadSettings(), base: app.files.config.base_currency });
+    const r = applyMetrics(app.files.portfolio, targets, fetched);
+    if (!r.updated.length) { toast(`Aucun ratio récupéré. ${r.failed.slice(0, 3).join(' · ')}`, 'error'); return; }
+    commitPortfolio(r.portfolio, `Ratios Yahoo : ${r.updated.length} ligne(s)${r.empty.length ? ` dont ${r.empty.length} sans ratio (n/d)` : ''}${r.kept.length ? ` · ${r.kept.length} saisie(s) manuelle(s) gardée(s)` : ''}${r.failed.length ? ` · ${r.failed.length} échec(s)` : ''}`);
+  } catch (e) {
+    toast(`Ratios indisponibles : ${e.message}`, 'error');
+  }
+}
+
 /** Validate + save several files at once (Éditeur Données). Returns true on success. */
 function commitFiles(next, message) {
   const errs = data.validateAll(next, app.schemas);
@@ -307,7 +325,7 @@ async function main() {
     showErrors(errs);
     if (errs.portfolio || errs.config) return; // cannot value safely
     showConflicts(loaded.conflicts);
-    app.table = new HoldingsTable($('#holdings'), { onEditsChange: onEdits, onRowEdit: (id) => app.editors.openLine(id), onAdd: () => app.editors.openLine(null) });
+    app.table = new HoldingsTable($('#holdings'), { onEditsChange: onEdits, onRowEdit: (id) => app.editors.openLine(id), onAdd: () => app.editors.openLine(null), onFetchRatios: fetchRatios });
     viz.configureChartDefaults();
     document.querySelectorAll('[data-group]').forEach((b) => b.addEventListener('click', () => {
       app.grouping = b.dataset.group;

@@ -4,6 +4,7 @@
 // Optional variable ALLOWED_ORIGINS (comma list) overrides the default below.
 //
 // GET /search?isins=FR0000121014,...  ->  { results: { ISIN: [{symbol, exchange, exchange_name, type, name}] }, errors }
+// GET /metrics?symbols=AI.PA,...       ->  { results: { SYM: { metrics: {per, pcf, net_debt_ebitda}, notes } }, errors, as_of }
 // GET /quotes?symbols=TTE.PA,VOLV-B.ST  ->  { quotes: { SYM: {value, currency, prev_close, as_of, source} },
 //                                            errors: { SYM: message }, fetched_at }
 // Self-contained on purpose (no imports) so it can be pasted as-is. Parsing mirrors
@@ -53,6 +54,76 @@ function parseChart(body) {
   };
 }
 
+/**
+ * Yahoo quoteSummary (summaryDetail, financialData, defaultKeyStatistics) -> the user's 3 ratios.
+ *   per             = trailingPE; if Yahoo omits it and trailing EPS < 0: price / EPS (negative = loss-making)
+ *   pcf             = market cap / operating cash flow (only when price and accounts share a currency)
+ *   net_debt_ebitda = (total debt - total cash) / EBITDA (only when EBITDA > 0)
+ * Unavailable -> omitted (n/d), with the reason in `notes`. Never estimated.
+ */
+function parseSummary(body) {
+  const r = body?.quoteSummary?.result?.[0];
+  if (!r) throw new Error(body?.quoteSummary?.error?.description ?? 'symbole inconnu');
+  const v = (m, k) => { const x = r[m]?.[k]; return typeof x?.raw === 'number' ? x.raw : null; };
+  const priceCcy = r.summaryDetail?.currency ?? null;
+  const finCcy = r.financialData?.financialCurrency ?? null;
+  const sameCcy = priceCcy && finCcy && priceCcy === finCcy;
+  const out = {}, notes = [];
+  const pe = v('summaryDetail', 'trailingPE'), eps = v('defaultKeyStatistics', 'trailingEps'), price = v('financialData', 'currentPrice');
+  if (pe !== null) out.per = round(pe);
+  else if (eps !== null && eps < 0 && price !== null && sameCcy) { out.per = round(price / eps); notes.push('PER calculé : bénéfice par action négatif'); }
+  else notes.push('PER n/d');
+  const mcap = v('summaryDetail', 'marketCap'), ocf = v('financialData', 'operatingCashflow');
+  if (!sameCcy) notes.push(`P/CF n/d : cours en ${priceCcy ?? '?'}, comptes en ${finCcy ?? '?'}`);
+  else if (mcap !== null && ocf !== null && ocf !== 0) out.pcf = round(mcap / ocf);
+  else notes.push('P/CF n/d');
+  const debt = v('financialData', 'totalDebt'), cash = v('financialData', 'totalCash'), ebitda = v('financialData', 'ebitda');
+  if (ebitda !== null && ebitda <= 0) notes.push('DN/EBITDA n/d : EBITDA négatif');
+  else if (debt !== null && cash !== null && ebitda) out.net_debt_ebitda = round((debt - cash) / ebitda);
+  else notes.push('DN/EBITDA n/d');
+  return { metrics: out, notes: notes.join(' · '), currency: priceCcy, financial_currency: finCcy };
+}
+const round = (x) => Math.round(x * 100) / 100;
+
+// Yahoo needs a cookie + "crumb" for quoteSummary. Kept per worker instance, renewed on failure.
+let yahooSession = null;
+async function getSession(upstream, fresh = false) {
+  if (yahooSession && !fresh && Date.now() - yahooSession.t < 3600e3) return yahooSession;
+  const r1 = await upstream('https://fc.yahoo.com', { headers: { 'User-Agent': 'Mozilla/5.0' }, redirect: 'manual' });
+  const raw = (typeof r1.headers.getSetCookie === 'function' ? r1.headers.getSetCookie() : [r1.headers.get('set-cookie') ?? '']).join(', ');
+  const cookie = (raw.match(/A3=[^;]+/) ?? [''])[0];
+  if (!cookie) throw new Error('Yahoo : cookie de session indisponible');
+  const r2 = await upstream('https://query2.finance.yahoo.com/v1/test/getcrumb', { headers: { 'User-Agent': 'Mozilla/5.0', Cookie: cookie } });
+  const crumb = (await r2.text()).trim();
+  if (!crumb || crumb.length > 40 || crumb.includes('<')) throw new Error('Yahoo : jeton (crumb) indisponible');
+  yahooSession = { cookie, crumb, t: Date.now() };
+  return yahooSession;
+}
+
+async function metrics(url, origin, upstream) {
+  const symbols = [...new Set((url.searchParams.get('symbols') || '').split(',').map((s) => s.trim()).filter(Boolean))];
+  if (!symbols.length) return json({ error: 'paramètre symbols vide' }, 400, origin);
+  if (symbols.length > MAX_SYMBOLS) return json({ error: `maximum ${MAX_SYMBOLS} symboles` }, 400, origin);
+  const bad = symbols.filter((s) => !SYMBOL_RE.test(s));
+  if (bad.length) return json({ error: `symbole invalide : ${bad.join(', ')}` }, 400, origin);
+  const results = {}, errors = {};
+  const one = async (s, session) => {
+    const res = await upstream(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(s)}?modules=summaryDetail,financialData,defaultKeyStatistics&crumb=${encodeURIComponent(session.crumb)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json', Cookie: session.cookie }, cf: { cacheTtl: 21600, cacheEverything: true },
+    });
+    if (res.status === 401) throw Object.assign(new Error('session'), { retry: true });
+    return parseSummary(await res.json());
+  };
+  let session;
+  try { session = await getSession(upstream); } catch (e) { return json({ error: String(e.message) }, 502, origin); }
+  for (const s of symbols) { // sequential: gentle with Yahoo
+    try {
+      try { results[s] = await one(s, session); } catch (e) { if (!e.retry) throw e; session = await getSession(upstream, true); results[s] = await one(s, session); }
+    } catch (e) { errors[s] = String(e.message || e).slice(0, 160); }
+  }
+  return json({ results, errors, as_of: new Date().toISOString().slice(0, 10) }, 200, origin);
+}
+
 /** ISIN -> Yahoo listings (Yahoo search). */
 async function search(url, origin, upstream) {
   const isins = [...new Set((url.searchParams.get('isins') || '').split(',').map((s) => s.trim().toUpperCase()).filter(Boolean))];
@@ -86,7 +157,8 @@ async function handle(request, env = {}, upstream = fetch) {
 
   const url = new URL(request.url);
   if (url.pathname === '/search') return search(url, origin, upstream);
-  if (url.pathname !== '/quotes') return json({ error: 'route inconnue (/quotes?symbols=... ou /search?isins=...)' }, 404, origin);
+  if (url.pathname === '/metrics') return metrics(url, origin, upstream);
+  if (url.pathname !== '/quotes') return json({ error: 'route inconnue (/quotes, /search, /metrics)' }, 404, origin);
   const symbols = [...new Set((url.searchParams.get('symbols') || '').split(',').map((s) => s.trim()).filter(Boolean))];
   if (!symbols.length) return json({ error: 'paramètre symbols vide' }, 400, origin);
   if (symbols.length > MAX_SYMBOLS) return json({ error: `maximum ${MAX_SYMBOLS} symboles` }, 400, origin);
@@ -109,4 +181,4 @@ async function handle(request, env = {}, upstream = fetch) {
 }
 
 // Single default export (what Cloudflare expects). handle/parseChart are attached for tests only.
-export default { fetch: (request, env) => handle(request, env), handle, parseChart, parseSearch };
+export default { fetch: (request, env) => handle(request, env), handle, parseChart, parseSearch, parseSummary, _resetSession: () => { yahooSession = null; } };

@@ -73,12 +73,13 @@ function columns(ctx) {
         const res = r.rules?.results.find((x) => x.rule.metric === k);
         const v = r.h.metrics?.[k];
         if (!res) return v === undefined ? '<span class="sub">—</span>' : fmt.number(v, 2); // no rule on this line (ETF, cash...)
-        if (v === undefined || v === null) return '<span class="sub" title="Ratio non disponible : moins d\u2019information, pas d\u2019alerte">n/d</span>';
+        const src = r.h.metrics ? ` · ${r.h.metrics.source ?? 'saisi'} au ${fmt.date(r.h.metrics.as_of)}` : '';
+        if (v === undefined || v === null) return `<span class="sub" title="${esc(`Ratio non disponible : moins d’information, pas d’alerte${r.h.metrics?.notes ? ` (${r.h.metrics.notes})` : ''}`)}">n/d</span>`;
         if (res.state === 'fail') {
           const why = res.reason ?? `seuil ${res.rule.op.replace('<=', '≤').replace('>=', '≥')} ${fmt.number(res.rule.value, 2)}`;
-          return `<span class="ratio-warn" title="${esc(`${label} ${fmt.number(v, 2)} : ${why}`)}"><span aria-hidden="true">⚠ </span>${fmt.number(v, 2)}<span class="sr-only"> (${esc(why)})</span></span>`;
+          return `<span class="ratio-warn" title="${esc(`${label} ${fmt.number(v, 2)} : ${why}${src}`)}"><span aria-hidden="true">⚠ </span>${fmt.number(v, 2)}<span class="sr-only"> (${esc(why)})</span></span>`;
         }
-        return `<span title="${esc(`${label} dans le seuil`)}">${fmt.number(v, 2)}</span>`;
+        return `<span title="${esc(`${label} dans le seuil${src}`)}">${fmt.number(v, 2)}</span>`;
       },
     })),
     { id: 'm_as_of', path: 'metrics.as_of', label: 'Métriques au', edit: 'date', optional: true,
@@ -90,7 +91,8 @@ function columns(ctx) {
 }
 
 export class HoldingsTable {
-  constructor(root, { onEditsChange, onRowEdit, onAdd }) {
+  constructor(root, { onEditsChange, onRowEdit, onAdd, onFetchRatios }) {
+    this.onFetchRatios = onFetchRatios;
     this.onRowEdit = onRowEdit;
     this.onAdd = onAdd;
     this.root = root;
@@ -201,6 +203,7 @@ export class HoldingsTable {
         <div class="filters">${this.filterControls()}</div>
         <div class="table-actions">
           <details class="col-picker"><summary>Colonnes</summary><div class="col-list">${picker}</div></details>
+          <button type="button" data-action="ratios" title="Récupérer PER, P/CF et dette nette / EBITDA depuis Yahoo (vos saisies manuelles sont gardées)">Ratios Yahoo</button>
           <button type="button" data-action="add">+ Ajouter une ligne</button>
           <button type="button" data-action="toggle-edit" aria-pressed="${editing}">${editing ? 'Terminer l\'édition' : 'Éditer'}</button>
           ${pending ? `<span class="pending">${pending} modification${pending > 1 ? 's' : ''}</span>
@@ -245,6 +248,7 @@ export class HoldingsTable {
       if (a === 'discard') { this.edits = {}; this.render(); this.onEditsChange?.('discard'); }
       if (a === 'save') this.onEditsChange?.('save', this.edits);
       if (a === 'add') this.onAdd?.();
+      if (a === 'ratios') this.onFetchRatios?.();
     }));
   }
 

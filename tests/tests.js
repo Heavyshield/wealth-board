@@ -12,6 +12,7 @@ import { editingTests } from './editing.test.js';
 import { filesTests } from './files.test.js';
 import { stageGTests } from './stage-g.test.js';
 import { modelTests } from './model.test.js';
+import { metricsTests } from './metrics.test.js';
 import { evaluateRules, evaluateHolding, evaluateConstraints, reviewItems } from '../src/rules.js';
 
 const results = [];
@@ -247,6 +248,9 @@ await stageGTests({ test, assert, eq, files, schemas, validate, NOW, rows, expec
 
 // ---------------------------------------------------------------- extensible model + Éditeur Données
 await modelTests({ test, assert, eq, files, schemas, validate, NOW });
+
+// ---------------------------------------------------------------- ratios from Yahoo
+await metricsTests({ test, assert, eq, files, schemas, validate, NOW });
 
 const failed = results.filter((r) => !r.ok);
 window.testResults = { pass: results.length - failed.length, fail: failed.length, results };

@@ -128,6 +128,13 @@ Réglage unique (15 min) :
    (Accès Drive complet nécessaire : un fichier enregistré depuis le téléphone n'est pas visible avec l'accès minimal.)
    La connexion dure environ une heure, puis il suffit de recliquer.
 
+## Ratios (PER, P/CF, dette nette / EBITDA)
+Bouton **Ratios Yahoo** (au-dessus du tableau) : récupère les 3 ratios des actions qui ont un ticker, via votre proxy.
+Valeur au-dessus du seuil = orange ⚠ (avertissement). Ratio introuvable = « n/d », sans alerte (la raison est dans
+l'infobulle : devises différentes, EBITDA négatif…). Un ratio saisi à la main (✎) n'est jamais remplacé.
+Nécessite la dernière version du proxy : Cloudflare → `wealth-quotes` → Edit code → coller
+[`tools/yahoo-proxy-worker.js`](tools/yahoo-proxy-worker.js) → Deploy.
+
 ## Éditeur de données (ajouter des lignes en JSON)
 Données → **Éditeur de données** :
 - **Ajouter des lignes** : collez `{ "holdings": [ … ] }` (par ex. des lignes préparées par Claude). Une ligne avec un
