@@ -7,11 +7,13 @@ import { HoldingsTable } from './table.js';
 import * as viz from './charts.js';
 import { evaluateRules, evaluateConstraints, reviewItems } from './rules.js';
 import { renderReview, renderConstraints } from './review.js';
+import * as prices from './prices.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-const app = { files: null, source: null, schemas: null, table: null, rows: null, grouping: localStorage.getItem('wb.ui.grouping') || 'envelope' };
+const app = { files: null, source: null, schemas: null, table: null, rows: null, grouping: localStorage.getItem('wb.ui.grouping') || 'envelope',
+  live: { fx: {}, spot: {}, quotes: {} }, report: null, refreshed_at: null, refreshing: false, merged: null };
 
 function toast(message, kind = 'info') {
   const el = document.createElement('div');
@@ -70,7 +72,9 @@ function renderCharts() {
 function render() {
   const { portfolio, config } = app.files;
   const now = new Date();
-  const rows = evaluateRules(valueHoldings({ portfolio, config, now }), config, now);
+  const merged = prices.mergeLive(portfolio, config, app.live);
+  app.merged = merged;
+  const rows = evaluateRules(valueHoldings({ portfolio: merged.portfolio, config, now, quotes: merged.quotes }), config, now);
   app.rows = rows;
   const constraints = evaluateConstraints(rows, portfolio, config);
   renderReview($('#review'), reviewItems(rows, constraints, config, fmt), { onSelect: focusTarget });
@@ -80,6 +84,82 @@ function render() {
   viz.renderKpis($('#summary'), rows, config, app.files.history);
   renderCharts();
   app.table.setData(rows, config, now);
+  if (!app.refreshing) renderPriceStatus();
+}
+
+// ---------------------------------------------------------------- prices
+function renderPriceStatus(progress) {
+  const el = $('#price-status');
+  const rep = app.report;
+  const live = Object.keys(app.merged?.quotes ?? {}).length;
+  const errs = (rep ?? []).flatMap((r) => Object.entries(r.errors).map(([k, m]) => ({ p: prices.PROVIDERS[r.provider]?.label ?? r.provider, k, m })));
+  const lines = (rep ?? []).map((r) => {
+    const label = prices.PROVIDERS[r.provider]?.label ?? r.provider;
+    const kind = { fx: 'change', spot: 'métaux', quote: 'cours' }[r.kind];
+    const nErr = Object.keys(r.errors).length;
+    return r.skipped ? `<li>${esc(label)} (${kind}) : ${esc(r.skipped)}</li>` : `<li>${esc(label)} (${kind}) : ${r.ok} OK${nErr ? `, ${nErr} échec(s)` : ''}</li>`;
+  }).join('');
+  const time = app.refreshed_at ? new Date(app.refreshed_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+  const main = progress ? `<span class="spinner" aria-hidden="true"></span> ${esc(progress)}`
+    : app.refreshed_at ? `Cours vérifiés à ${time} · change, métaux et ${live} cours d'action en direct`
+    : 'Cours du fichier (pas encore actualisés dans ce navigateur)';
+  el.innerHTML = `<span class="ps-main">${main}</span>
+    ${rep ? `<details class="ps-details"><summary>${errs.length ? `⚠ ${errs.length} problème(s)` : 'Détails'}</summary>
+      <ul>${lines}</ul>
+      ${errs.length ? `<ul class="ps-errors">${errs.slice(0, 30).map((e) => `<li><code>${esc(e.k)}</code> (${esc(e.p)}) : ${esc(e.m)}</li>`).join('')}</ul>` : ''}
+    </details>` : ''}
+    ${live || Object.keys(app.live.fx).length || Object.keys(app.live.spot).length ? '<button type="button" id="persist-prices" title="Écrire ces cours dans portfolio.json (copie locale) pour Claude et les autres appareils">Mémoriser les cours</button>' : ''}`;
+  $('#persist-prices')?.addEventListener('click', persistPrices);
+}
+
+async function refreshPrices(force) {
+  if (app.refreshing) return;
+  app.refreshing = true;
+  $('#refresh').disabled = true;
+  try {
+    const res = await prices.refreshPrices(app.files.portfolio, app.files.config, { force, onProgress: (m) => renderPriceStatus(m) });
+    Object.assign(app, { live: res.live, report: res.report, refreshed_at: res.refreshed_at });
+  } catch (e) {
+    toast(`Actualisation impossible : ${e.message}`, 'error');
+    console.error(e);
+  } finally {
+    app.refreshing = false;
+    $('#refresh').disabled = false;
+    render();
+  }
+}
+
+function persistPrices() {
+  const next = prices.persistPrices(app.files.portfolio, app.merged, 'user');
+  const errs = data.validateAll({ ...app.files, portfolio: next }, app.schemas);
+  if (errs.portfolio) { toast(`Refusé : ${errs.portfolio[0].path} : ${errs.portfolio[0].message}`, 'error'); return; }
+  data.saveWorking('portfolio', next, app.source.portfolio.revision);
+  app.files.portfolio = next;
+  render();
+  toast(`Cours mémorisés dans la copie locale (rév. ${next.revision}).`);
+}
+
+function initSettings() {
+  const dlg = $('#settings'), form = $('#settings-form');
+  $('#open-settings').addEventListener('click', () => {
+    const s = prices.loadSettings();
+    form.yahoo_proxy_url.value = s.yahoo_proxy_url ?? '';
+    form.twelvedata_key.value = s.twelvedata_key ?? '';
+    dlg.showModal();
+  });
+  $('#settings-cancel').addEventListener('click', () => dlg.close());
+  $('#clear-cache').addEventListener('click', () => {
+    prices.clearCache();
+    Object.assign(app, { live: { fx: {}, spot: {}, quotes: {} }, report: null, refreshed_at: null });
+    render();
+    toast('Cache des cours vidé.');
+  });
+  form.addEventListener('submit', () => {
+    const url = form.yahoo_proxy_url.value.trim();
+    prices.saveSettings({ yahoo_proxy_url: url || undefined, twelvedata_key: form.twelvedata_key.value.trim() || undefined });
+    toast('Réglages enregistrés dans ce navigateur.');
+    refreshPrices(true);
+  });
 }
 
 /** Jump from a review item to what it is about, briefly highlighted. */
@@ -148,7 +228,18 @@ async function main() {
       localStorage.setItem('wb.ui.grouping', app.grouping);
       renderCharts();
     }));
+    app.live = prices.liveFromCache(app.files.portfolio, app.files.config);
+    const unknown = Object.entries(app.files.config.providers ?? {})
+      .filter(([k]) => ['fx', 'spot', 'quote'].includes(k))
+      .flatMap(([k, ids]) => ids.filter((id) => prices.PROVIDERS[id]?.kind !== k).map((id) => ({
+        path: `config.providers.${k}`,
+        message: `fournisseur « ${id} » inconnu pour ce type (disponibles : ${Object.values(prices.PROVIDERS).filter((p) => p.kind === k).map((p) => p.id).join(', ')})`,
+      })));
+    if (unknown.length) showErrors({ config: unknown });
+    initSettings();
+    $('#refresh').addEventListener('click', () => refreshPrices(true));
     render();
+    if (app.files.config.providers?.auto_refresh) refreshPrices(false);
   } catch (e) {
     showErrors({ chargement: [{ path: 'data', message: e.message }] });
     console.error(e);

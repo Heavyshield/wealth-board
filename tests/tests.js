@@ -6,6 +6,7 @@ import { validate } from '../src/schema.js';
 import { loadSchemas, validateAll, crossCheck, applyEdits } from '../src/data.js';
 import { valueHoldings, totals } from '../src/valuation.js';
 import * as fmt from '../src/format.js';
+import { pricesTests } from './prices.test.js';
 import { evaluateRules, evaluateHolding, evaluateConstraints, reviewItems } from '../src/rules.js';
 
 const results = [];
@@ -228,6 +229,9 @@ await test('Contrôle croisé : contrainte et règle avec ids inconnus', () => {
   const text = JSON.stringify(crossCheck(files.portfolio, cfg));
   assert(text.includes('pea_typo') && text.includes('equities'), text);
 });
+
+// ---------------------------------------------------------------- stage d: prices
+await pricesTests({ test, assert, eq, files, schemas, validate, NOW });
 
 const failed = results.filter((r) => !r.ok);
 window.testResults = { pass: results.length - failed.length, fail: failed.length, results };

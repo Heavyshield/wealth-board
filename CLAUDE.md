@@ -8,7 +8,7 @@ Footer must always read: "Outil de suivi, pas un conseil en investissement."
 - [x] (a) data model, validation, holdings table, filters, inline edit, local working copy, tests
 - [x] (b) KPIs (hero total, latent P&L, day change with coverage, price freshness) + 4 charts
 - [x] (c) rules engine (config.rules), constraint meters (config.constraints), "À revoir" panel, editable metrics
-- [ ] (d) price providers (adapter per provider, fallback chain, localStorage TTL cache)
+- [x] (d) price providers: FX (Frankfurter > ECB), metals (gold-api), quotes (own Yahoo proxy > Twelve Data), cache, fallback
 - [ ] (e) Boursorama CSV import with diff preview
 - [ ] (f) Google Drive sync (GIS, drive.file) + File System Access fallback + conflicts
 - [ ] (g) "Export for Claude" + snapshot button
@@ -25,6 +25,10 @@ src/table.js        holdings table (column defs, sort, filters, picker, inline e
 src/charts.js       KPI tiles + charts (allocation donut, history line, actual vs target, P&L bars)
 src/rules.js        pure: rule status per line, constraint evaluation, ranked review items
 src/review.js       UI: "À revoir" list (click = jump to the line) + constraint meters
+src/prices.js       orchestration: needs, localStorage cache + TTL, fallback chains, batching, mergeLive, persistPrices
+src/providers/*.js  one adapter per source (common.js = interface + helpers); pure parse() tested on real fixtures
+tools/yahoo-proxy-worker.js  Cloudflare Worker the user deploys (Yahoo has no CORS); self-contained
+tests/prices.test.js + tests/fixtures/*.json  real API responses captured 2026-11-25
 src/format.js       fr-FR formatting + parsing of typed numbers
 data/*.json         portfolio / config / history (repo copy = FAKE sample data only)
 schema/*.schema.json  one schema per data file
@@ -105,7 +109,9 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - **Add an asset class / envelope**: add to `config.asset_classes` / `config.envelopes` (pick `pricing`).
 - **Add a rule**: append to `config.rules.items` (any metric name); add that metric + `as_of` to the holdings' `metrics`.
 - **Add a constraint**: append to `config.constraints` with one of the 3 types above.
-- **Add a price provider** (stage d): one file in `src/providers/`, common interface; CORS-test first.
+- **Add a price provider**: CORS-test it from a browser page on localhost first. Then one file in
+  `src/providers/` (interface in common.js: id, kind, needs, batch, minIntervalMs, fetch, pure parse), register it in
+  `PROVIDERS` (prices.js), add it to a chain in `config.providers`, capture a real response in tests/fixtures and test parse().
 - **Change the data shape**: update the schema, `crossCheck` in data.js if needed, compute_expected.py, tests.
 
 ## Safe-edit checklist (Claude editing data files)
@@ -123,11 +129,26 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - Must be served over http(s) (file:// blocks module/JSON loading; the page says so).
 - Local dev: `python -m http.server 8770` in the repo, open http://localhost:8770/ and /tests/.
 
-## Verified APIs (browser fetch from localhost, 2026-11-24)
+## Prices (src/prices.js)
+- Chains per kind in `config.providers` {fx, spot, quote, ttl_minutes, auto_refresh}. A provider whose setting is
+  missing (`needs`) is skipped and reported "non configuré". Every failure is listed under "Détails"; nothing is invented.
+- Holding: `ticker` (Yahoo format) used by all providers unless `symbols.{provider}` overrides; `price_source`
+  "quote:<id>" forces one provider, "manual" never fetches. `manual_price` always wins in valuation.
+- Cache `wb.cache.prices` (localStorage) keyed `provider:symbol`; settings `wb.settings.prices` (proxy URL, keys)
+  stay in the browser -- never in data files or the repo.
+- `mergeLive`: newest `as_of` wins between live cache and file (so prices Claude writes are not overwritten by older
+  cache). FX block takes the oldest live as_of (conservative). "Mémoriser les cours" writes them into the file
+  (last_price + market_snapshot, revision+1, one changelog entry `field: "prices"`).
+- Yahoo `chartPreviousClose` (range=1d) = close before the current session -> base for day change. GBp/GBX/ZAc/ILA are
+  converted to major units. gold-api has no previous close: metals have no day change (shown as coverage, not 0).
+
+## Verified APIs (browser fetch from localhost, 2026-11-24/25)
 - FX: `https://api.frankfurter.dev/v1/latest?base=EUR` (ECB rates, CORS *, no key). Fallback: ECB SDMX
   `https://data-api.ecb.europa.eu/service/data/EXR/D.CHF.EUR.SP00.A?lastNObservations=1&format=jsondata`.
-- Metals: `https://api.gold-api.com/price/XAU` (USD, CORS ok, no key).
+- Metals: `https://api.gold-api.com/price/XAU/EUR` (per oz, any currency, CORS ok, no key).
+- Blocked from the browser (no CORS): Yahoo, Stooq, Boerse Frankfurt, Nasdaq Nordic, EODHD, Swissquote.
+  Euronext live endpoints answer but the payload is encrypted. -> Yahoo only through tools/yahoo-proxy-worker.js.
 - Equities: Twelve Data free plan (key tested 2026-11-25) covers **US only**: Euronext Paris needs Grow,
-  Swiss needs Pro, Stockholm/Oslo/Copenhagen symbols refused. Decision for stage d still open.
+  Swiss needs Pro, Stockholm/Oslo/Copenhagen symbols refused. Used as US fallback after the proxy.
   The key is never stored in the repo (localStorage only).
   Yahoo and Swissquote are CORS-blocked from the browser.

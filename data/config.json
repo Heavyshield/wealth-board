@@ -232,5 +232,24 @@
         ]
       }
     }
-  ]
+  ],
+  "providers": {
+    "fx": [
+      "frankfurter",
+      "ecb"
+    ],
+    "spot": [
+      "goldapi"
+    ],
+    "quote": [
+      "yahoo_proxy",
+      "twelvedata"
+    ],
+    "ttl_minutes": {
+      "quote": 15,
+      "spot": 15,
+      "fx": 360
+    },
+    "auto_refresh": true
+  }
 }

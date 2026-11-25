@@ -16,6 +16,8 @@
     <h1>Wealth Board</h1>
     <span id="rev" class="rev"></span>
     <nav class="top-actions">
+      <button type="button" id="refresh" class="primary">Actualiser les cours</button>
+      <button type="button" id="open-settings">Réglages</button>
       <button type="button" id="export">Exporter portfolio.json</button>
       <button type="button" id="reset-local">Réinitialiser la copie locale</button>
       <button type="button" id="theme" aria-label="Basculer clair / sombre">◐</button>
@@ -26,6 +28,7 @@
     <p id="sample-banner" class="banner" hidden>Données d'exemple fictives. Vos données réelles se chargeront depuis Google Drive ou un dossier local.</p>
     <section id="errors" class="errors" role="alert" hidden></section>
     <section id="conflicts" class="conflicts" hidden></section>
+    <section id="price-status" class="price-status" aria-live="polite"></section>
     <section id="summary" class="summary" aria-label="Synthèse"></section>
     <section class="decide" aria-label="À revoir et contraintes">
       <article class="card" id="review"></article>
@@ -76,6 +79,23 @@
       <div id="holdings"></div>
     </section>
   </main>
+
+  <dialog id="settings" aria-labelledby="settings-title">
+    <form method="dialog" id="settings-form">
+      <h2 id="settings-title">Réglages des cours</h2>
+      <p class="sub-title">Enregistrés dans ce navigateur uniquement (jamais dans les fichiers de données ni sur GitHub).</p>
+      <label class="field"><span>URL de votre proxy Yahoo (Cloudflare Worker)</span>
+        <input type="url" name="yahoo_proxy_url" placeholder="https://wealth-quotes.votre-compte.workers.dev" autocomplete="off" spellcheck="false"></label>
+      <label class="field"><span>Clé API Twelve Data (actions US)</span>
+        <input type="password" name="twelvedata_key" autocomplete="off" spellcheck="false"></label>
+      <p class="sub-title">Ordre d'essai : <code>config.json → providers</code>. Un prix saisi à la main reste toujours prioritaire.</p>
+      <div class="dialog-actions">
+        <button type="button" id="clear-cache">Vider le cache des cours</button>
+        <button type="button" id="settings-cancel">Annuler</button>
+        <button type="submit" class="primary" value="save">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
 
   <footer class="foot">Outil de suivi, pas un conseil en investissement.</footer>
   <div id="toasts" class="toasts" aria-live="polite"></div>

@@ -311,6 +311,13 @@
         "updated_at": {
           "type": "string",
           "format": "date-or-date-time"
+        },
+        "symbols": {
+          "type": "object",
+          "description": "Symbol per provider id when it differs from ticker",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },

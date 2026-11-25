@@ -356,6 +356,51 @@
           }
         }
       }
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fx": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "spot": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "quote": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ttl_minutes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "quote": {
+              "type": "number",
+              "minimum": 0
+            },
+            "spot": {
+              "type": "number",
+              "minimum": 0
+            },
+            "fx": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "auto_refresh": {
+          "type": "boolean"
+        }
+      }
     }
   },
   "$defs": {

@@ -6,7 +6,7 @@
   "market_snapshot": {
     "fx": {
       "base": "EUR",
-      "as_of": "2026-11-24T16:00:00Z",
+      "as_of": "2026-11-21T14:15:00Z",
       "source": "sample",
       "rates": {
         "CHF": 0.92,

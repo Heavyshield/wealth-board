@@ -106,6 +106,22 @@ select, input[type="search"], input[type="text"] { background: var(--surface); b
 @keyframes flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 3px transparent; } }
 @media (prefers-reduced-motion: reduce) { .flash { animation: none; outline: 3px solid var(--accent); } }
 
+/* Stage d: price status line + settings dialog */
+.price-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 12px; font-size: .88rem; color: var(--muted); }
+.ps-details summary { cursor: pointer; }
+.ps-details ul { margin: 6px 0; padding-left: 18px; }
+.ps-errors code { font-size: .85em; }
+.spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); max-width: min(520px, 92vw); padding: 16px 20px; }
+dialog::backdrop { background: rgb(0 0 0 / .45); }
+dialog h2 { margin-top: 0; }
+.field { display: grid; gap: 4px; margin: 12px 0; font-size: .9rem; }
+.field input { width: 100%; }
+.dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+button:disabled { opacity: .55; cursor: progress; }
+
 /* Chart cards */
 .viz { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .card h2 { margin: 0; font-size: 1rem; }
