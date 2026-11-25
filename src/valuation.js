@@ -149,7 +149,7 @@ export function valueHoldings({ portfolio, config, now = new Date(), quotes = {}
  * `outside` = known value of lines outside net worth, `to_fill` = lines with an unknown amount.
  */
 export function totals(rows) {
-  let value = 0, cost = 0, missingFx = 0, day = 0, dayCovered = 0, outside = 0, toFill = 0;
+  let value = 0, cost = 0, missingFx = 0, day = 0, dayCovered = 0, week = 0, weekCovered = 0, weekAny = false, outside = 0, toFill = 0;
   const byStatus = {};
   for (const r of rows) {
     if (r.to_fill || r.no_price) { toFill++; continue; }
@@ -159,12 +159,17 @@ export function totals(rows) {
     cost += r.cost_base_cents ?? 0;
     byStatus[r.price.status] = (byStatus[r.price.status] ?? 0) + r.value_base_cents;
     if (r.day_base !== null) { day += toCents(r.day_base); dayCovered += r.value_base_cents; }
+    // Week: market lines with a ~7-day-old close; balances count at 0 (they do not move).
+    if (typeof r.week_base === 'number') { week += toCents(r.week_base); weekCovered += r.value_base_cents; weekAny = true; }
+    else if (r.price.status === 'balance') weekCovered += r.value_base_cents;
   }
   const share = Object.fromEntries(Object.entries(byStatus).map(([k, c]) => [k, value ? c / value : 0]));
   return {
     value: value / 100, cost: cost / 100, pnl: (value - cost) / 100, value_cents: value,
     by_status_share: share, missing_fx: missingFx, outside: outside / 100, to_fill: toFill,
     day: dayCovered ? day / 100 : null, day_coverage: value ? dayCovered / value : 0,
+    week: weekAny ? week / 100 : null, // null until a market line has a week-old close (balances alone say nothing)
+    week_coverage: value ? weekCovered / value : 0,
   };
 }
 

@@ -57,10 +57,10 @@ function axis(opts, { money, base, stacked = false } = {}) {
 
 // ---------------------------------------------------------------- KPIs
 
-/** Day change in % of yesterday's value of the lines it covers (balances included at 0). */
-export function dayPct(t) {
-  const covered = t.day_coverage * t.value;
-  return t.day === null || covered - t.day <= 0 ? null : t.day / (covered - t.day);
+/** Change in % of the starting value of the lines it covers (balances included at 0). */
+export function changePct(change, coverage, value) {
+  const covered = coverage * value;
+  return change === null || covered - change <= 0 ? null : change / (covered - change);
 }
 
 export function renderKpis(el, rows, config, history) {
@@ -85,11 +85,11 @@ export function renderKpis(el, rows, config, history) {
       <span class="kpi-sub">sur ${fmt.money(t.cost, base, { digits: 0 })} investis</span>
     </div>
     <div class="tile">
-      <span class="kpi-label">Variation du jour</span>
-      ${t.day === null
-        ? '<span class="tile-value muted">indisponible</span><span class="kpi-sub">aucun cours du jour avec clôture veille</span>'
-        : `<span class="tile-value ${sign(t.day)}">${fmt.signedMoney(t.day, base)} <span class="tile-pct" title="Par rapport à la valeur de la veille des lignes comptées">${fmt.pct(dayPct(t))}</span></span>
-           <span class="kpi-sub" title="Comptent : les soldes (comptes, cash : 0 €) et les lignes avec un cours à jour et une clôture de la veille (actions, ETF, métaux)">calculée sur ${fmt.pct(t.day_coverage, { signed: false })} de la valeur</span>`}
+      <span class="kpi-label">Variation de la semaine</span>
+      ${t.week === null
+        ? '<span class="tile-value muted">indisponible</span><span class="kpi-sub">aucun cours avec une clôture d’il y a ~7 jours (actualiser les cours)</span>'
+        : `<span class="tile-value ${sign(t.week)}">${fmt.signedMoney(t.week, base)} <span class="tile-pct" title="Par rapport à la valeur d’il y a ~7 jours des lignes comptées">${fmt.pct(changePct(t.week, t.week_coverage, t.value))}</span></span>
+           <span class="kpi-sub" title="Quantités actuelles × variation des cours sur ~7 jours. Comptent : les soldes (comptes, cash : 0 €) et les lignes avec un cours à jour (actions, ETF, métaux). Aujourd’hui : ${t.day === null ? 'n/d' : fmt.signedMoney(t.day, base)}">calculée sur ${fmt.pct(t.week_coverage, { signed: false })} de la valeur</span>`}
     </div>
     <div class="tile freshness">
       <span class="kpi-label">Fraîcheur des prix (part de la valeur)</span>

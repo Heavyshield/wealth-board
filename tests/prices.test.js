@@ -9,6 +9,8 @@ import * as yp from '../src/providers/yahoo-proxy.js';
 import worker from '../tools/yahoo-proxy-worker.js';
 import { refreshPrices, mergeLive, persistPrices, liveFromCache, withFuturesHistory } from '../src/prices.js';
 import { topMoves } from '../src/top-moves.js';
+import { totals } from '../src/valuation.js';
+import { changePct } from '../src/charts.js';
 
 const fx = async (name) => (await fetch(`./fixtures/${name}`, { cache: 'no-store' })).json();
 
@@ -75,6 +77,14 @@ export async function pricesTests({ test, assert, eq, files, schemas, validate, 
     eq(s.close_1w, 28, 'semaine'); eq(s.close_1m, 43.75, 'mois'); eq(s.history_source, 'Yahoo SI=F', 'source');
     eq(withFuturesHistory(spot, { ...fut, as_of: '2026-11-15T00:00:00Z' }), spot, 'contrat trop ancien : ignoré');
     eq(withFuturesHistory(spot, undefined), spot, 'pas de contrat : spot inchangé');
+  });
+
+  await test('Variation de la semaine : total, couverture (soldes à 0 €), % sur la valeur de départ', () => {
+    const row = (status, cents, week_base) => ({ in_total: true, value_base_cents: cents, cost_base_cents: cents, price: { status }, day_base: null, week_base });
+    const t = totals([row('live', 110000, 100), row('live', 50000, null), row('balance', 40000, null), row('live', 0, null)]);
+    eq(t.week, 100, 'total semaine'); eq(t.week_coverage, 150000 / 200000, 'couverture : ligne avec semaine + solde');
+    eq(Math.round(changePct(t.week, t.week_coverage, t.value) * 1e6), Math.round(100 / 1400 * 1e6), '% = 100 / (1 500 − 100)');
+    eq(totals([row('balance', 40000, null)]).week, null, 'soldes seuls : indisponible');
   });
 
   await test('Plus gros mouvements : 3 plus grandes variations en euros, hausse ou baisse, hors patrimoine exclu', () => {

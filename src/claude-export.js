@@ -55,6 +55,7 @@ export function buildClaudeExport({ rows, files, constraints = [], review = [], 
   L(`- Patrimoine : **${eur(t.value, base)}** · investi ${eur(t.cost, base)} · +/- latente ${eur(t.pnl, base)} (${pct1(t.cost ? t.pnl / t.cost : null)})`);
   if (t.outside) L(`- Hors patrimoine (suivi seulement) : ${eur(t.outside, base)}`);
   if (t.to_fill) L(`- Lignes au montant inconnu (à compléter, non comptées) : ${t.to_fill}`);
+  L(`- Variation de la semaine : ${t.week === null ? 'indisponible' : `${eur(t.week, base)} (sur ${pct1(t.week_coverage)} de la valeur)`}`);
   L(`- Variation du jour : ${t.day === null ? 'indisponible' : `${eur(t.day, base)} (sur ${pct1(t.day_coverage)} de la valeur)`}`);
   L(`- Fraîcheur des prix (part de la valeur) : ${Object.entries(t.by_status_share).map(([k, v]) => `${k} ${pct1(v)}`).join(', ')}`);
   const last = history.snapshots.at(-1);

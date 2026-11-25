@@ -122,6 +122,8 @@ to detect that a file changed under a local copy and asks the user instead of ov
    back), exchange-local days. Rows: `week_base` = qty x (price - close_1w) at today's FX (market move of what is held,
    trades ignored), `week_pct`, `month_pct`; live quotes only, else null. UI: "Plus gros mouvements de la semaine"
    card (src/top-moves.js, top 3 by |week_base|) and the "1 mois %" column. Needs the worker redeployed.
+9. KPI tile = "Variation de la semaine" (user, 2026-11-25): totals().week = sum of week_base, week_coverage counts
+   balances at 0 €; % = week / (covered value - week). The day change stays in the tile tooltip and the Claude export.
 8. Balances (`par`: accounts, cash) count in the day change at 0 € (they do not move) -> coverage ~ all but manual.
    Metals: gold-api has no previous close, so `withFuturesHistory` applies the Yahoo futures move (GC=F, SI=F, PL=F,
    PA=F via the proxy /quotes, cached as quote `yahoo_proxy:GC=F`) to the spot: prev / week / month = spot x
