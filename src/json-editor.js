@@ -44,9 +44,10 @@ export function createJsonEditor({ dialog, getFiles, schemas, commitFiles }) {
     const summary = [
       r.added.length ? `Ajout : ${r.added.join(', ')}` : null,
       r.updated.length ? `Mise à jour : ${r.updated.join(', ')}` : null,
+      r.removed.length ? `Suppression : ${r.removed.join(', ')}` : null,
       r.unchanged.length ? `Inchangé : ${r.unchanged.length}` : null,
     ].filter(Boolean);
-    if (!r.added.length && !r.updated.length) summary.push('Aucun changement.');
+    if (!r.added.length && !r.updated.length && !r.removed.length) summary.push('Aucun changement.');
     return { mode: 'merge', next: r.files, summary, problems: r.problems };
   }
 

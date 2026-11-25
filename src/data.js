@@ -210,7 +210,8 @@ export function removeSampleData(portfolio, sample, author = 'user', now = new D
 
 // ---------------------------------------------------------------- merge pasted lines (Éditeur Données)
 /**
- * Merge a pasted fragment into the files. Fragment = { holdings?: [...], envelopes?: [...], asset_classes?: [...] }
+ * Merge a pasted fragment into the files. Fragment = { holdings?: [...], envelopes?: [...], asset_classes?: [...],
+ *   remove?: [holding ids] }
  * (or a bare array of holdings). Items are matched by `id`: new ones are added, existing ones updated field by
  * field. Every change is logged (author). Returns { files: NEW {portfolio, config, history}, added, updated, unchanged, problems }.
  * Lines must carry `as_of` (date the amount is known); missing -> problem, line skipped.
@@ -220,7 +221,7 @@ export function mergeFragment(files, fragment, author = 'user', now = new Date()
   const frag = Array.isArray(fragment) ? { holdings: fragment } : fragment ?? {};
   const portfolio = structuredClone(files.portfolio);
   const config = structuredClone(files.config);
-  const out = { added: [], updated: [], unchanged: [], problems: [] };
+  const out = { added: [], updated: [], unchanged: [], removed: [], problems: [] };
   const log = (file, target, field, old, nw) => portfolio.changelog.push({ date, file, target, field, old: old ?? null, new: nw ?? null, author });
   let configChanged = false;
   for (const kind of ['envelopes', 'asset_classes']) {
@@ -248,7 +249,14 @@ export function mergeFragment(files, fragment, author = 'user', now = new Date()
     }
     if (changed) { h.updated_at = date; out.updated.push(line.id); } else out.unchanged.push(line.id);
   }
-  if (out.added.length || out.updated.length) { portfolio.revision += 1; portfolio.updated_at = date; }
+  for (const id of frag.remove ?? []) {
+    const h = portfolio.holdings.find((x) => x.id === id);
+    if (!h) { out.problems.push(`suppression : ligne « ${id} » introuvable`); continue; }
+    portfolio.holdings = portfolio.holdings.filter((x) => x.id !== id);
+    log('portfolio', id, 'holding', h, 'suppression'); // full line kept in the changelog
+    out.removed.push(id);
+  }
+  if (out.added.length || out.updated.length || out.removed.length) { portfolio.revision += 1; portfolio.updated_at = date; }
   if (configChanged) { config.revision += 1; config.updated_at = date; }
   return { files: { ...files, portfolio, config }, ...out };
 }

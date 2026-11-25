@@ -78,5 +78,9 @@ export async function modelTests({ test, assert, eq, files, schemas, validate, N
     assert(r.files.portfolio.changelog.every((c) => c.author === 'claude'), 'auteur claude');
     for (const f of ['portfolio', 'config']) assert(validate(schemas[f], r.files[f]).length === 0, `${f} valide : ${JSON.stringify(validate(schemas[f], r.files[f]).slice(0, 2))}`);
     eq(files.portfolio.holdings.find((h) => h.id === 'livret-a').quantity, 12000, 'original intact');
+    const rm = mergeFragment(files, { remove: ['livret-ldds', 'inconnue'] }, 'claude', NOW);
+    eq(rm.removed.join(), 'livret-ldds', 'ligne supprimée');
+    assert(rm.problems[0].includes('inconnue'), 'id inconnu signalé');
+    eq(rm.files.portfolio.changelog.at(-1).old.id, 'livret-ldds', 'ligne complète dans le journal');
   });
 }

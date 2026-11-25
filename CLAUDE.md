@@ -160,6 +160,8 @@ to detect that a file changed under a local copy and asks the user instead of ov
    - lines matched by `id` (stable kebab-case, never reused); new id = `<envelope>-<name-slug>`;
    - every line has `as_of` (date the amount is true); unknown amount -> `"quantity": null` (TO_FILL), never guessed;
    - updating a line: `{ "id": "...", "quantity": 1234, "as_of": "YYYY-MM-DD" }` is enough (fields merged);
+   - removing a line: `"remove": ["id", ...]` (full line kept in the changelog);
+   - a new kind of asset: add it in `"asset_classes"` (e.g. `preferred`, pricing quote: rules do not apply to it);
    - metals: `asset_class: "metal"`, `metal {code, weight, unit, purity}` per item, quantity = number of items
      (or grams with weight 1 g); purity/weight assumptions written in `notes`;
    - extra facts (term, lock-up, provider) in `details` (free object, not used in calculations).
