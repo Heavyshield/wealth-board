@@ -120,7 +120,7 @@ Réglage unique (15 min) :
 3. **Écran de consentement OAuth** (« Google Auth Platform ») → **Commencer** : nom `Wealth Board`, votre e-mail,
    audience **Externe** → **Créer**. Puis **Audience → Utilisateurs test → Ajouter** : votre adresse Gmail.
 4. **Clients → Créer un client** → **Application Web** → **Origines JavaScript autorisées** :
-   `https://heavyshield.github.io` et `http://localhost:8770` → **Créer**.
+   `https://heavyshield.github.io` (ajouter `http://localhost:8770` seulement pour tester en local) → **Créer**.
 5. Copier l'ID client (`….apps.googleusercontent.com`) dans `data/config.json` → `"drive": { "client_id": "…" }`
    → commit + push. Ce n'est pas un secret (il ne marche que depuis ces deux adresses).
 6. Site → **Données** → **Se connecter à Google Drive**. Google affiche « application non validée » (c'est la vôtre,

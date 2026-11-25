@@ -61,7 +61,8 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
 
   // ------------------------------------------------------------------ optional Drive login (computer)
   let session = null; // { token, expires } -- memory only
-  const clientId = () => app.files.config.drive?.client_id;
+  // The user's own wealth-board.json carries its config (often without "drive"): fall back to the site's data/config.json.
+  const clientId = () => app.files.config.drive?.client_id || app.source?.config?.drive?.client_id;
   const loggedIn = () => session && Date.now() < session.expires;
   const files = () => driveFiles(session.token, data.BUNDLE_NAME);
   async function guard(fn) {

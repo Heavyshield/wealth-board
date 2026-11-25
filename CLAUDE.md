@@ -204,7 +204,8 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - **Claude editing the data:** read `wealth-board.json` from Drive, edit the part(s), bump that part's `revision` +
   `updated_at`, add changelog entries (`author: "claude"`), validate against /schema, write the file back (or give it
   to the user to put on Drive). The user then re-opens it in the board.
-- Optional desktop login (`config.drive.client_id`, empty = hidden): GIS token in memory, scope `drive` (full) because
+- Optional desktop login (`config.drive.client_id`, set 2026-11-25, origin authorised: GitHub Pages only, NOT localhost;
+  the user's file config wins, else the site's data/config.json; empty = hidden): GIS token in memory, scope `drive` (full) because
   files saved from the phone's share sheet are not visible with drive.file. Code only touches files named
   wealth-board.json: open newest, offer to trash older copies, save = PATCH in place after a version check
   (changed since opened -> confirm). No background sync.

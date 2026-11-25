@@ -169,7 +169,7 @@ button.danger { color: var(--missing); border-color: var(--missing); margin-righ
 
 /* Stage g: journal + export */
 .journal-card { margin-top: 16px; }
-.per-rank-card { margin: 16px 0; }
+.per-rank-card { align-self: start; }
 .per-rank-card table.mini td:first-child { width: 2.5em; color: var(--muted); }
 .journal-card summary { cursor: pointer; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; list-style: none; }
 .journal-card summary h2 { margin: 0; }
