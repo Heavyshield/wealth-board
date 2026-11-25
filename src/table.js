@@ -30,9 +30,9 @@ export function statusBadge(price, now) {
 function ruleBadge(r) {
   const ev = r.rules;
   if (!ev || ev.status === 'na') return '<span class="sub">—</span>';
-  const lines = ev.results.map((x) => `${x.state === 'pass' ? '✓' : x.state === 'fail' ? '✗' : '?'} ${x.rule.label}${x.value !== null ? ` (${fmt.number(x.value, 2)})` : ' : non saisi'}`);
+  const lines = ev.results.map((x) => `${x.state === 'pass' ? '✓' : x.state === 'fail' ? '⚠' : '·'} ${x.rule.label}${x.value !== null ? ` (${fmt.number(x.value, 2)})` : ' : n/d'}`);
   if (ev.metrics_age_days !== null) lines.push(`Métriques : ${ev.metrics_age_days} j`);
-  const icon = { ok: '✓', breach: '✗', incomplete: '?', stale: '⏱' }[ev.status];
+  const icon = { ok: '✓', breach: '⚠', partial: '✓', unknown: '·', stale: '⏱' }[ev.status];
   return `<span class="rbadge rbadge-${ev.status}" title="${esc(lines.join(' · '))}"><span aria-hidden="true">${icon}</span> ${RULE_STATUS[ev.status].label}</span>`;
 }
 
@@ -72,8 +72,13 @@ function columns(ctx) {
       cell: (r) => {
         const res = r.rules?.results.find((x) => x.rule.metric === k);
         const v = r.h.metrics?.[k];
-        return v === undefined ? (res ? '<span class="sub">à saisir</span>' : '—')
-          : `<span class="${res?.state === 'fail' ? 'neg' : ''}">${fmt.number(v, 2)}</span>`;
+        if (!res) return v === undefined ? '<span class="sub">—</span>' : fmt.number(v, 2); // no rule on this line (ETF, cash...)
+        if (v === undefined || v === null) return '<span class="sub" title="Ratio non disponible : moins d\u2019information, pas d\u2019alerte">n/d</span>';
+        if (res.state === 'fail') {
+          const why = res.reason ?? `seuil ${res.rule.op.replace('<=', '≤').replace('>=', '≥')} ${fmt.number(res.rule.value, 2)}`;
+          return `<span class="ratio-warn" title="${esc(`${label} ${fmt.number(v, 2)} : ${why}`)}"><span aria-hidden="true">⚠ </span>${fmt.number(v, 2)}<span class="sr-only"> (${esc(why)})</span></span>`;
+        }
+        return `<span title="${esc(`${label} dans le seuil`)}">${fmt.number(v, 2)}</span>`;
       },
     })),
     { id: 'm_as_of', path: 'metrics.as_of', label: 'Métriques au', edit: 'date', optional: true,
@@ -104,6 +109,12 @@ export class HoldingsTable {
     this.labels = { env, cls };
     const saved = JSON.parse(localStorage.getItem('wb.ui.columns') || 'null');
     this.visible = new Set(saved ?? config.table?.default_columns ?? this.cols.map((c) => c.id));
+    // One-time: show the rule status + the 3 ratio columns (they used to be hidden by default).
+    if (!localStorage.getItem('wb.ui.ratios_v1')) {
+      ['rules', 'm_per', 'm_pcf', 'm_net_debt_ebitda'].forEach((c) => this.visible.add(c));
+      localStorage.setItem('wb.ui.columns', JSON.stringify([...this.visible]));
+      localStorage.setItem('wb.ui.ratios_v1', '1');
+    }
     this.render();
   }
 

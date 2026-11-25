@@ -100,8 +100,9 @@ select, input[type="search"], input[type="text"] { background: var(--surface); b
 .meter-info { background: color-mix(in srgb, var(--st-info) 22%, transparent); } .meter-info .meter-fill { background: var(--st-info); }
 .meter-mark { position: absolute; top: -4px; width: 2px; height: 16px; background: var(--text); border-radius: 1px; transform: translateX(-1px); }
 .rbadge { display: inline-block; white-space: nowrap; border-radius: 4px; padding: 0 6px; font-size: .75rem; font-weight: 600; color: #0b0b0b; }
-.rbadge-ok { background: var(--st-good); } .rbadge-breach { background: var(--st-crit); color: #fff; }
-.rbadge-incomplete, .rbadge-stale { background: var(--st-warn); }
+.rbadge-ok, .rbadge-partial { background: var(--st-good); } .rbadge-breach, .rbadge-stale { background: var(--st-warn); }
+.rbadge-unknown { background: none; color: var(--muted); font-weight: 500; padding: 0; }
+.ratio-warn { color: var(--stale); font-weight: 600; }
 .flash { animation: flash 1.6s ease-out; }
 @keyframes flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 3px transparent; } }
 @media (prefers-reduced-motion: reduce) { .flash { animation: none; outline: 3px solid var(--accent); } }

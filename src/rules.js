@@ -4,7 +4,8 @@
 //
 // Rule status per holding (worst wins):
 //   breach     - at least one rule fails (incl. a non-positive value where require_positive)
-//   incomplete - a metric needed by a rule is missing (never guessed)
+//   partial    - some ratios unavailable (n/d), the known ones pass: less information, no alert
+//   unknown    - no ratio available at all: no alert
 //   stale      - all rules pass but metrics.as_of is older than rules.metrics_max_age_days
 //   ok         - all rules pass on recent metrics
 //   na         - no rule applies to this line (ETF, cash, metals...)
@@ -19,9 +20,10 @@ const DAY = 864e5;
 
 export const RULE_STATUS = {
   ok: { label: 'Conforme', severity: 0 },
-  stale: { label: 'Métriques anciennes', severity: 2 },
-  incomplete: { label: 'À compléter', severity: 2 },
-  breach: { label: 'Hors règles', severity: 3 },
+  stale: { label: 'Ratios anciens', severity: 1 },
+  partial: { label: 'Partiel', severity: 0 },
+  unknown: { label: 'Ratios n/d', severity: -1 },
+  breach: { label: 'Au-dessus d\u2019un seuil', severity: 2 },
   na: { label: '—', severity: -1 },
 };
 
@@ -47,9 +49,12 @@ export function evaluateHolding(h, config, now = new Date()) {
     return { rule, state: OPS[rule.op](v, rule.value) ? 'pass' : 'fail', value: v };
   });
   const stale = maxAge !== undefined && ageDays !== null && ageDays > maxAge;
+  // A ratio we cannot get (n/d) is not a problem, just less information.
+  const known = results.filter((r) => r.state !== 'missing');
   const status = results.some((r) => r.state === 'fail') ? 'breach'
-    : results.some((r) => r.state === 'missing') ? 'incomplete'
-    : stale ? 'stale' : 'ok';
+    : !known.length ? 'unknown'
+    : stale ? 'stale'
+    : known.length < results.length ? 'partial' : 'ok';
   return { status, results, metrics_age_days: ageDays, metrics_stale: stale };
 }
 
@@ -113,15 +118,13 @@ export function reviewItems(rows, constraints, config, fmt) {
     const ev = r.rules;
     if (ev?.status === 'breach') {
       const fails = ev.results.filter((x) => x.state === 'fail').map((x) => `${metricText(x)} ${fmt.number(x.value, 2)} (${x.reason ?? `règle ${x.rule.op.replace('<=', '≤').replace('>=', '≥')} ${fmt.number(x.rule.value, 2)}`})`);
-      items.push({ severity: 3, kind: 'règle', title: r.h.name, detail: fails.join(' · ') + (ev.metrics_stale ? ` · métriques de ${ev.metrics_age_days} j` : ''), amount: r.value_base, target: r.id });
-    } else if (ev?.status === 'incomplete') {
-      const miss = ev.results.filter((x) => x.state === 'missing').map(metricText);
-      items.push({ severity: 2, kind: 'métriques', title: r.h.name, detail: `À saisir : ${miss.join(', ')}`, amount: r.value_base, target: r.id });
+      items.push({ severity: 2, kind: 'seuil', title: r.h.name, detail: fails.join(' · ') + (ev.metrics_stale ? ` · métriques de ${ev.metrics_age_days} j` : ''), amount: r.value_base, target: r.id });
     } else if (ev?.status === 'stale') {
-      items.push({ severity: 2, kind: 'métriques', title: r.h.name, detail: `Métriques datées de ${ev.metrics_age_days} jours (max ${config.rules.metrics_max_age_days})`, amount: r.value_base, target: r.id });
+      items.push({ severity: 1, kind: 'ratios', title: r.h.name, detail: `Métriques datées de ${ev.metrics_age_days} jours (max ${config.rules.metrics_max_age_days})`, amount: r.value_base, target: r.id });
     }
     if (r.to_fill) { items.push({ severity: 1, kind: 'à compléter', title: r.h.name, detail: 'Montant inconnu : non compté (à renseigner, sans deviner)', amount: 0, target: r.id }); continue; }
-    if (r.price.status === 'missing') items.push({ severity: 3, kind: 'prix', title: r.h.name, detail: 'Aucun prix : valorisé au prix de revient', amount: r.value_base, target: r.id });
+    if (r.no_price) items.push({ severity: 3, kind: 'prix', title: r.h.name, detail: 'Aucun cours ni prix de revient : non compté (Actualiser les cours)', amount: 0, target: r.id });
+    else if (r.price.status === 'missing') items.push({ severity: 3, kind: 'prix', title: r.h.name, detail: 'Aucun cours : valorisé au prix de revient', amount: r.value_base, target: r.id });
     else if (r.price.status === 'stale') items.push({ severity: 2, kind: 'prix', title: r.h.name, detail: `Dernier prix ${fmt.age(r.price.as_of)}`, amount: r.value_base, target: r.id });
     if (r.fx_missing) items.push({ severity: 3, kind: 'change', title: r.h.name, detail: `Taux ${r.h.currency} manquant : ligne exclue du total`, amount: 0, target: r.id });
   }

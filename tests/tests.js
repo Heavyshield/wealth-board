@@ -149,7 +149,7 @@ const st = (id) => rows.find((r) => r.id === id).rules.status;
 await test('Règles : statuts attendus sur les données d’exemple', () => {
   eq(st('pea-exemple-industries'), 'ok', 'PER 18, P/CF 11, DN/EBITDA 1,2');
   eq(st('pea-demo-energie'), 'breach', 'PER 31 > 25 et DN/EBITDA 3,1 > 2,5');
-  eq(st('cto-fjord-exempel'), 'incomplete', 'aucune métrique');
+  eq(st('cto-fjord-exempel'), 'unknown', 'aucun ratio : n/d, pas d’alerte');
   eq(st('cto-sample-corp'), 'breach', 'P/CF 16,5 > 15');
   eq(st('pea-etf-monde'), 'na', 'ETF hors périmètre');
   eq(st('livret-a'), 'na', 'livret hors périmètre');
@@ -177,7 +177,7 @@ await test('Règles : une règle ajoutée dans le JSON seul s’applique (métri
   const cfg = structuredClone(files.config);
   cfg.rules.items.push({ id: 'yield-min', label: 'Rendement ≥ 2 %', metric: 'dividend_yield', op: '>=', value: 2, applies_to: { asset_class: ['equity'] } });
   const h = structuredClone(files.portfolio.holdings[0]);
-  eq(evaluateHolding(h, cfg, NOW).status, 'incomplete', 'métrique absente');
+  eq(evaluateHolding(h, cfg, NOW).status, 'partial', 'un ratio n/d, les autres conformes');
   h.metrics.dividend_yield = 1.4;
   eq(evaluateHolding(h, cfg, NOW).status, 'breach', 'rendement 1,4 < 2');
   assert(validate(schemas.config, cfg).length === 0, 'config étendue valide');
@@ -204,10 +204,11 @@ await test('À revoir : critiques d’abord, triés par montant', () => {
     const a = items[i - 1], b = items[i];
     assert(a.severity > b.severity || (a.severity === b.severity && (a.amount ?? 0) >= (b.amount ?? 0)), `ordre ${i}`);
   }
-  const titles = items.filter((i) => i.severity === 3).map((i) => i.title);
-  assert(titles.includes('Poche métaux précieux'), 'contrainte métaux');
-  assert(titles.includes('Démo Énergie (fictif)') && titles.includes('Sample Corp (fictive)'), 'lignes hors règles');
-  assert(items.some((i) => i.severity === 2 && i.title === 'Fjord Exempel AB (fictif)'), 'métriques à saisir');
+  const crit = items.filter((i) => i.severity === 3).map((i) => i.title);
+  const warn = items.filter((i) => i.severity === 2).map((i) => i.title);
+  assert(crit.includes('Poche métaux précieux'), 'contrainte métaux');
+  assert(warn.includes('Démo Énergie (fictif)') && warn.includes('Sample Corp (fictive)'), 'seuils dépassés = avertissement');
+  assert(!items.some((i) => i.title === 'Fjord Exempel AB (fictif)' && i.kind !== 'prix'), 'ratios n/d : aucune alerte');
 });
 
 await test('Édition de métrique (chemin metrics.per) + suppression', () => {

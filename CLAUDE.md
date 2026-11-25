@@ -79,9 +79,11 @@ to detect that a file changed under a local copy and asks the user instead of ov
 
 ## Rules and constraints (src/rules.js) -- JSON only, no code
 - Rule: `{ id, label, metric, op: <=|<|>=|>, value, require_positive?, applies_to? {asset_class[], envelope[], tags_exclude[]}, why? }`.
-  `require_positive`: a value <= 0 fails (loss-making PER). Missing metric -> "À compléter", never a pass.
-  Line status, worst wins: breach > incomplete > stale (metrics older than metrics_max_age_days) > ok; `na` = no rule applies.
-- Constraint types:
+  `require_positive`: a value <= 0 fails (loss-making PER). Missing metric -> shown "n/d", never counted as a pass, no alert.
+  Line status: breach (a ratio above its threshold: WARNING, severity 2, orange) > unknown (no ratio available)
+  > stale (older than metrics_max_age_days, info) > partial (some ratios n/d, the known ones pass) > ok; `na` = no rule.
+  A ratio we cannot get is shown "n/d" and raises NO alert (user decision 2026-11-25: less info, not a problem).
+  Ratio columns (PER, P/CF, DN/EBITDA) are visible by default (one-time migration wb.ui.ratios_v1).
   - `share_cap` `{group_by, keys[], max?, min?}` -> share of total value; breach above max, warn below min.
   - `runway` `{monthly_budget, target_months, liquid: scope}` -> months = liquid value / budget; warn < target, breach < half.
 - "À revoir" = rule breaches, missing/stale metrics, missing/stale prices, missing FX, constraints not OK,
