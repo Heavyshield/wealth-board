@@ -83,6 +83,7 @@ export async function importTests({ test, assert, eq, files, schemas, validate, 
     assert(next.holdings.some((h) => h.id === 'pea-demo-energie'), 'suppression décochée = ligne gardée');
     const ex = next.holdings.find((h) => h.id === 'pea-exemple-industries');
     eq(ex.quantity, 45, 'quantité'); eq(ex.unit_cost, 51.2, 'PRU');
+    eq(next.changelog.find((c) => c.target === 'pea-exemple-industries' && c.field === 'quantity').price, 62.5, 'prix de l’export noté sur l’ordre');
     eq(ex.last_price.value, 62.5, 'prix du fichier, plus récent que le cache'); eq(ex.last_price.source, 'Boursorama CSV', 'source');
     const soc = next.holdings.find((h) => h.id === 'pea-nouvelle-societe-fictive');
     eq(soc.last_price.value, 1080, 'prix de la nouvelle ligne');

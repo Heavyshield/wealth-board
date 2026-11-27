@@ -28,6 +28,8 @@ src/table.js        holdings table (column defs, sort, filters, picker, inline e
 src/charts.js       KPI tiles + charts (allocation donut, history line, actual vs target, P&L bars)
 src/rules.js        pure: rule status per line, constraint evaluation, ranked review items
 src/review.js       UI: "À revoir" list (click = jump to the line) + constraint meters
+src/trades.js       "Ordres par mois" card: orders derived from import journal entries (first import per envelope =
+                    start; quantity change / new / removed line = 1 order; export price on the entry -> amount)
 src/ratio-guide.js  "Mes ratios" card: thresholds per ratio from config.rules + plain-language tooltip (RATIO_HELP)
 src/per-rank.js     "Actions par PER" card: equity lines only, PER ascending, negative then n/d last (rankByPer pure)
 src/prices.js       orchestration: needs, localStorage cache + TTL, fallback chains, batching, mergeLive, persistPrices

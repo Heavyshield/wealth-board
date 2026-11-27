@@ -133,7 +133,9 @@ export function tickerCandidates(diff, portfolio, config, envelope) {
 export function applyImport(portfolio, diff, pick, { label, now = new Date(), price, tickers = {} } = {}) {
   const date = now.toISOString().replace(/\.\d{3}Z$/, 'Z');
   const next = structuredClone(portfolio);
-  const log = (target, field, old, nw) => next.changelog.push({ date, file: 'portfolio', target, field, old: old ?? null, new: nw ?? null, author: 'user', note: label });
+  // `price` (export price) on position changes: lets the trade view (src/trades.js) show order amounts.
+  const log = (target, field, old, nw, price) => next.changelog.push({ date, file: 'portfolio', target, field, old: old ?? null, new: nw ?? null, author: 'user', note: label,
+    ...(typeof price === 'number' && price > 0 ? { price } : {}) });
   const withPrice = (h, pos) => {
     if (!price || pos.last_price === undefined || !(pos.last_price > 0)) return;
     if (h.last_price && new Date(h.last_price.as_of) >= new Date(price.as_of)) return; // newest wins
@@ -145,12 +147,12 @@ export function applyImport(portfolio, diff, pick, { label, now = new Date(), pr
     const h = { ...structuredClone(a.holding), as_of: asOf, updated_at: date };
     withPrice(h, a.pos);
     next.holdings.push(h);
-    log(h.id, 'holding', null, 'ajout');
+    log(h.id, 'holding', null, 'ajout', a.pos.last_price);
   }
   for (const c of diff.changed) {
     if (!pick.changed.has(c.holding.id)) continue;
     const h = next.holdings.find((x) => x.id === c.holding.id);
-    for (const f of c.fields) { log(h.id, f.field, f.old, f.new); h[f.field] = f.new; }
+    for (const f of c.fields) { log(h.id, f.field, f.old, f.new, f.field === 'quantity' ? c.pos.last_price : undefined); h[f.field] = f.new; }
     h.as_of = asOf;
     withPrice(h, c.pos);
     h.updated_at = date;
@@ -158,7 +160,7 @@ export function applyImport(portfolio, diff, pick, { label, now = new Date(), pr
   for (const r of diff.removed) {
     if (!pick.removed.has(r.holding.id)) continue;
     next.holdings = next.holdings.filter((x) => x.id !== r.holding.id);
-    log(r.holding.id, 'holding', r.holding, 'suppression'); // full old line kept in the changelog
+    log(r.holding.id, 'holding', r.holding, 'suppression', r.holding.last_price?.value); // full old line kept; price = last known (sold line absent from the export)
   }
   for (const [id, symbol] of Object.entries(tickers)) {
     const h = next.holdings.find((x) => x.id === id);

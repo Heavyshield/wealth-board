@@ -396,6 +396,11 @@
         },
         "note": {
           "type": "string"
+        },
+        "price": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Unit price of the export at an import position change (order amount)"
         }
       }
     }

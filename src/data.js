@@ -232,6 +232,14 @@ export function mergeFragment(files, fragment, author = 'user', now = new Date()
       else if (JSON.stringify(config[kind][i]) !== JSON.stringify(item)) { log('config', `${kind}:${item.id}`, kind, config[kind][i], item); config[kind][i] = item; out.updated.push(`${kind}:${item.id}`); configChanged = true; }
     }
   }
+  if (frag.discipline && typeof frag.discipline === 'object') {
+    if (JSON.stringify(config.discipline ?? null) !== JSON.stringify(frag.discipline)) {
+      log('config', 'discipline', 'discipline', config.discipline ?? null, frag.discipline);
+      config.discipline = frag.discipline;
+      (config.discipline === undefined ? out.added : out.updated).push('discipline');
+      configChanged = true;
+    }
+  }
   for (const item of frag.constraints ?? []) {
     if (!item?.id) { out.problems.push('contrainte sans id'); continue; }
     config.constraints ??= [];

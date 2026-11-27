@@ -529,6 +529,15 @@
         }
       }
     },
+    "discipline": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Trade discipline card: envelope whose orders are counted, optional monthly limit",
+      "properties": {
+        "envelope": { "type": "string" },
+        "max_trades_per_month": { "type": "integer", "minimum": 0 }
+      }
+    },
     "drive": {
       "type": "object",
       "additionalProperties": false,
