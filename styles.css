@@ -170,6 +170,9 @@ button.danger { color: var(--missing); border-color: var(--missing); margin-righ
 /* Stage g: journal + export */
 .journal-card { margin-top: 16px; }
 .per-rank-card { align-self: start; }
+.data-status { font-weight: 600; margin: 4px 0 8px; }
+.data-status.warn { color: var(--stale); }
+.data-status.ok { color: var(--pos); }
 .conflict-choices { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
 .conflict-choices button { text-align: left; }
 .tile-pct { font-size: .6em; font-weight: 600; white-space: nowrap; }

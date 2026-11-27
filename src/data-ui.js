@@ -279,34 +279,35 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
   function refresh() {
     if (!dialog.open) return;
     const m = meta();
-    const share = canShare();
+    // One status line, same states as the header badge.
+    const status = isSample() ? { cls: '', text: 'Données d’exemple affichées.' }
+      : remoteNewer ? { cls: 'warn', text: '⚠ Une version plus récente est sur Drive (autre appareil) : rechargez-la avant de modifier.' }
+      : unsaved() ? { cls: 'warn', text: '⚠ Modifications pas encore enregistrées sur Drive.' }
+      : m.saved_at ? { cls: 'ok', text: `✓ ${m.saved_where === 'local' ? 'Copie téléchargée' : 'À jour sur Drive'} · enregistré le ${when(m.saved_at)}.` }
+      : { cls: 'ok', text: `✓ À jour · ouvert le ${when(m.opened_at)}.` };
     dialog.innerHTML = `<form method="dialog" class="editor data-dialog">
       <h2>Données</h2>
-      <p class="sub-title">Vos données vivent dans <strong>${data.BUNDLE_NAME}</strong> sur Google Drive. Ce navigateur en garde une copie pour s'ouvrir vite.</p>
-      <p>${isSample() ? 'Affiché : <strong>données d’exemple</strong>.'
-        : `Affiché : portefeuille rév. ${app.files.portfolio.revision}${m.name ? ` · ouvert depuis ${esc(m.name)} le ${when(m.opened_at)}` : ''}${m.saved_at ? ` · enregistré le ${when(m.saved_at)}` : ''}.`}
-        ${unsaved() ? '<br><strong>Modifications non enregistrées sur Drive.</strong>' : ''}</p>
-      <h3>Ouvrir</h3>
+      <p class="data-status ${status.cls}">${status.text}</p>
+      ${clientId() ? `<p class="sub">Fichier : <strong>${folder() ? esc(folder().path) : 'dossier pas encore choisi'} / ${data.BUNDLE_NAME}</strong>
+        <button type="button" class="linklike" data-folder>${folder() ? 'Changer de dossier' : 'Choisir le dossier'}</button></p>` : ''}
       <div class="data-steps">
-        <button type="button" class="primary" data-open-drive>Depuis Google Drive${clientId() && !loggedIn() ? ' (connexion)' : ''}</button>
-        <label class="button-like">Fichier local…<input type="file" accept=".json,application/json" multiple data-open hidden></label>
+        <button type="button" class="primary" data-save-drive>Enregistrer sur Drive</button>
+        <button type="button" data-open-drive>Recharger depuis Drive</button>
       </div>
-      <h3>Enregistrer</h3>
-      <div class="data-steps">
-        <button type="button" class="primary" data-save-drive>Sur Google Drive</button>
-        <button type="button" data-save-local>Fichier local (télécharger)</button>
-      </div>
+      <p class="sub">« Enregistrer » écrit tout : positions, cours du moment et relevé du jour (un par jour).
+        ${clientId() ? (loggedIn() ? '' : 'La connexion Google est demandée au premier clic.')
+          : isPhone() ? 'Sur téléphone : menu de partage → « Enregistrer dans Drive ».'
+          : 'Sans connexion Google : le fichier est téléchargé, puis remplacé à la main dans Drive (expliqué au clic).'}</p>
       <p class="sub drive-help" hidden></p>
-      ${clientId() ? `<p>Dossier Drive : <strong>${folder() ? esc(folder().path) : 'pas encore choisi (demandé au premier usage)'}</strong>
-        <button type="button" class="linklike" data-folder>${folder() ? 'Changer' : 'Choisir'}</button></p>` : ''}
-      <p class="sub">${clientId() ? 'Connecté à Google, le fichier est lu et remplacé directement dans ce dossier Drive.'
-        : isPhone() ? 'Sur téléphone, Google Drive apparaît dans le sélecteur de fichiers et dans le menu de partage.'
-        : 'Sur ordinateur, sans connexion Google, le site ne peut pas lire Drive lui-même : une étape manuelle est expliquée au clic.'}</p>
       <h3>Éditeur de données</h3>
       <div class="data-steps"><button type="button" data-edit-json="lines">Ajouter des lignes (JSON)…</button>
         <button type="button" data-edit-json="full">Modifier le fichier complet…</button></div>
       <details><summary>Autres actions</summary>
+        <p class="sub">Portefeuille rév. ${app.files.portfolio.revision}${m.name ? ` · ouvert depuis ${esc(m.name)} le ${when(m.opened_at)}` : ''}${m.saved_at ? ` · enregistré le ${when(m.saved_at)}` : ''}.
+          Ce navigateur garde une copie pour s’ouvrir vite ; la référence est ${data.BUNDLE_NAME} sur Drive.</p>
         <div class="dialog-actions start">
+          <label class="button-like">Ouvrir un fichier local…<input type="file" accept=".json,application/json" multiple data-open hidden></label>
+          <button type="button" data-save-local>Télécharger une copie</button>
           ${data.FILES.map((f) => `<button type="button" data-export="${f}">Télécharger ${f}.json seul</button>`).join('')}
           <button type="button" class="danger" data-reset>Effacer la copie de ce navigateur</button>
         </div>

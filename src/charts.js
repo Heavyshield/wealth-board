@@ -147,19 +147,22 @@ export function renderHistory(el, history, config, rows) {
   const canvasBox = el.querySelector('.chart-box');
   const tableBox = el.querySelector('.data-table');
   destroy('history');
+  tableBox.innerHTML = !snaps.length ? '' : `<table class="mini"><thead><tr><th scope="col">Date</th><th scope="col" class="num">Patrimoine</th><th scope="col" class="num">Investi</th></tr></thead>
+    <tbody>${snaps.map((s) => `<tr><td>${fmt.date(s.date)}</td><td class="num">${fmt.money(s.total, base, { digits: 0 })}</td><td class="num">${s.cost !== undefined ? fmt.money(s.cost, base, { digits: 0 }) : '—'}</td></tr>`).join('')}</tbody></table>`;
   if (snaps.length < 2) {
-    canvasBox.innerHTML = '<p class="empty-chart">Pas encore assez de relevés : l\'historique se construit avec le bouton « Relevé » (étape g).</p>';
-    tableBox.innerHTML = '';
+    canvasBox.innerHTML = snaps.length
+      ? `<p class="empty-chart">1 relevé (${fmt.date(snaps[0].date)} : ${fmt.money(snaps[0].total, base, { digits: 0 })}). La courbe apparaît au 2e relevé, pris un autre jour à l’enregistrement.</p>`
+      : '<p class="empty-chart">Aucun relevé : le premier est pris au prochain « Enregistrer » (Données).</p>';
     return;
   }
   if (!canvasBox.querySelector('canvas')) canvasBox.innerHTML = '<canvas aria-label="Évolution du patrimoine"></canvas>';
-  tableBox.innerHTML = `<table class="mini"><thead><tr><th scope="col">Date</th><th scope="col" class="num">Patrimoine</th><th scope="col" class="num">Investi</th></tr></thead>
-    <tbody>${snaps.map((s) => `<tr><td>${fmt.date(s.date)}</td><td class="num">${fmt.money(s.total, base, { digits: 0 })}</td><td class="num">${s.cost !== undefined ? fmt.money(s.cost, base, { digits: 0 }) : '—'}</td></tr>`).join('')}</tbody></table>`;
   if (!window.Chart) return;
 
   const pal = palette(config);
   const opts = baseOptions();
-  const labels = snaps.map((s) => fmt.monthLabel(s.date));
+  // Short history: one label per day; beyond ~3 months: month labels.
+  const spanDays = (new Date(snaps.at(-1).date) - new Date(snaps[0].date)) / 864e5;
+  const labels = snaps.map((s) => (spanDays < 90 ? fmt.date(s.date) : fmt.monthLabel(s.date)));
   opts.interaction = { mode: 'index', intersect: false };
   opts.scales = { x: axis(opts), y: axis(opts, { money: true, base }) };
   opts.scales.x.grid.display = false;

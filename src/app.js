@@ -109,7 +109,7 @@ function render() {
 function renderPriceStatus(progress) {
   const el = $('#price-status');
   const rep = app.report;
-  const live = Object.keys(app.merged?.quotes ?? {}).length;
+  const live = Object.keys(app.live?.quotes ?? {}).length; // prices received now (merged.quotes only keeps those newer than the file)
   const quoteIds = new Set(app.files.config.asset_classes.filter((c) => c.pricing === 'quote').map((c) => c.id));
   const noTicker = app.files.portfolio.holdings.filter((h) => quoteIds.has(h.asset_class) && !h.ticker && !h.manual_price && h.price_source !== 'manual').length;
   const errs = (rep ?? []).flatMap((r) => Object.entries(r.errors).map(([k, m]) => ({ p: prices.PROVIDERS[r.provider]?.label ?? r.provider, k, m })));
