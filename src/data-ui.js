@@ -53,7 +53,7 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
     if (unsaved() && !confirm('Vos modifications ici ne sont pas encore enregistrées sur Drive. Les remplacer par ce fichier ?')) return false;
     if (older && !confirm(`Ce fichier (rév. ${files.portfolio.revision}) est plus ancien que les données affichées (rév. ${app.files.portfolio.revision}). L'ouvrir quand même ?`)) return false;
     for (const [f, d] of Object.entries(files)) { data.saveWorking(f, d, app.source[f].revision, { dirty: false }); app.files[f] = d; }
-    setMeta({ name: label, opened_at: new Date().toISOString(), saved_at: null, drive_id: null, drive_version: null, ...extraMeta });
+    setMeta({ name: label, opened_at: new Date().toISOString(), saved_at: null, drive_id: null, drive_version: null, drive_md5: null, ...extraMeta });
     render(); refresh();
     toast(`Ouvert : ${label} (portefeuille rév. ${app.files.portfolio.revision}).`);
     return true;
@@ -146,7 +146,7 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
     if (!all.length) { toast(`Aucun ${data.BUNDLE_NAME} dans « ${dir.path} » : enregistrez une première fois, ou changez de dossier (Données).`); return; }
     const [newest, ...older] = all;
     const obj = JSON.parse(await files().read(newest.id));
-    const ok = await openObjects([{ name: newest.name, obj }], `Drive (${when(newest.modifiedTime)})`, { drive_id: newest.id, drive_version: newest.version });
+    const ok = await openObjects([{ name: newest.name, obj }], `Drive (${when(newest.modifiedTime)})`, { drive_id: newest.id, drive_version: newest.version, drive_md5: newest.md5Checksum ?? null });
     if (ok && older.length && confirm(`${all.length} copies de ${data.BUNDLE_NAME} sur Drive (enregistrements depuis le téléphone). La plus récente est ouverte. Mettre les ${older.length} autres à la corbeille de Drive (récupérables 30 jours) ?`)) {
       for (const o of older) await files().trash(o.id);
       toast(`${older.length} ancienne(s) copie(s) mise(s) à la corbeille.`);
@@ -160,13 +160,16 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
     let target = m.drive_id ? await files().meta(m.drive_id).catch(() => null) : null;
     if (target && !target.parents?.includes(dir.id)) target = null; // opened from another folder: save in the chosen one
     if (!target) target = (await files().list())[0] ?? null;
-    if (target && String(target.version) !== String(m.drive_version ?? '')) {
+    // Changed since we opened / last saved it? Compare the CONTENT checksum: Drive bumps `version` by itself after
+    // an upload, which made our own save look like someone else's (false alarm -> snapshots lost on Annuler).
+    const changed = target && (target.md5Checksum && m.drive_md5 ? target.md5Checksum !== m.drive_md5 : String(target.version) !== String(m.drive_version ?? ''));
+    if (changed) {
       const who = target.lastModifyingUser?.displayName;
       if (!confirm(`${data.BUNDLE_NAME} sur Drive a été modifié le ${when(target.modifiedTime)}${who ? ` (${who})` : ''} depuis votre ouverture. Le remplacer par la version affichée ici ?\n(Annuler, puis « Ouvrir depuis Drive » pour récupérer l'autre version.)`)) return;
     }
     const saved = target ? await files().update(target.id, text) : await files().create(text);
     for (const f of data.FILES) data.saveWorking(f, app.files[f], app.source[f].revision, { dirty: false });
-    setMeta({ saved_at: new Date().toISOString(), drive_id: saved.id, drive_version: saved.version });
+    setMeta({ saved_at: new Date().toISOString(), drive_id: saved.id, drive_version: saved.version, drive_md5: saved.md5Checksum ?? null });
     toast(target ? `${data.BUNDLE_NAME} remplacé dans « ${dir.path} » (version précédente gardée dans l'historique Drive).` : `${data.BUNDLE_NAME} créé dans « ${dir.path} ».`);
   });
 

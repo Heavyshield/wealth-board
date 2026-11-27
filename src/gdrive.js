@@ -6,7 +6,7 @@
 export const SCOPE = 'https://www.googleapis.com/auth/drive';
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
-const FIELDS = 'id,name,modifiedTime,version,parents,lastModifyingUser(displayName)';
+const FIELDS = 'id,name,modifiedTime,version,md5Checksum,parents,lastModifyingUser(displayName)';
 const FOLDER = 'application/vnd.google-apps.folder';
 /** Escape a value for a Drive query string literal. */
 const lit = (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
