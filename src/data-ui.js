@@ -7,13 +7,15 @@
 
 import * as data from './data.js';
 import { signIn, driveFiles, driveFolders } from './gdrive.js';
+import { remoteChanged, olderParts, copyName } from './save-plan.js';
 
 const META = 'wb.file'; // { name, opened_at, saved_at }
 const when = (iso) => (iso ? new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /** ctx: { app, render, toast, dialog, badge, openButton }. Returns { afterLocalSave, updateBadge }. */
-export function initDataUI({ app, render, toast, dialog, badge, openButton, openEditor }) {
+// beforeSave(): writes current prices + today's snapshot into app.files (app.js, save-plan.js); false = abort.
+export function initDataUI({ app, render, toast, dialog, badge, openButton, openEditor, beforeSave = () => true }) {
   const meta = () => JSON.parse(localStorage.getItem(META) || '{}');
   const setMeta = (m) => localStorage.setItem(META, JSON.stringify({ ...meta(), ...m }));
   const unsaved = () => data.FILES.some((f) => data.readWorking(f)?.dirty);
@@ -22,12 +24,14 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
     try { return Boolean(navigator.canShare?.({ files: [new File(['{}'], 'x.json', { type: 'application/json' })] })); } catch { return false; }
   };
 
+  let remoteNewer = false; // logged in and Drive's content differs from what we last opened / saved
   function updateBadge() {
     const m = meta();
     let text, warn = false;
-    if (unsaved()) { text = 'Modifié · à enregistrer'; warn = true; }
+    if (remoteNewer) { text = 'Plus récent sur Drive · ouvrir'; warn = true; }
+    else if (unsaved()) { text = 'Non enregistré sur Drive'; warn = true; }
     else if (isSample()) text = 'Données d’exemple';
-    else text = `${m.saved_where === 'local' ? 'Enregistré (local)' : 'Enregistré'} ✓ ${when(m.saved_at ?? m.opened_at)}`;
+    else text = `${m.saved_where === 'local' ? 'Téléchargé' : 'Sur Drive'} ✓ ${when(m.saved_at ?? m.opened_at)}`;
     badge.textContent = text;
     badge.className = `sync-badge${warn ? ' warn' : ''}`;
   }
@@ -49,11 +53,15 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
     const errs = data.validateAll({ ...app.files, ...files }, app.schemas);
     const bad = Object.keys(files).filter((f) => errs[f]);
     if (bad.length) { toast(`Fichier refusé : ${bad[0]} · ${errs[bad[0]][0].path} : ${errs[bad[0]][0].message}`, 'error'); return false; }
-    const older = files.portfolio && !isSample() && files.portfolio.revision < app.files.portfolio.revision;
-    if (unsaved() && !confirm('Vos modifications ici ne sont pas encore enregistrées sur Drive. Les remplacer par ce fichier ?')) return false;
-    if (older && !confirm(`Ce fichier (rév. ${files.portfolio.revision}) est plus ancien que les données affichées (rév. ${app.files.portfolio.revision}). L'ouvrir quand même ?`)) return false;
+    const LABEL = { portfolio: 'positions', config: 'réglages et règles', history: 'historique (relevés)' };
+    const older = isSample() ? [] : olderParts(files, app.files);
+    const skip = extraMeta.skipConfirm;
+    delete extraMeta.skipConfirm;
+    if (!skip && unsaved() && !confirm('Vos modifications ici ne sont pas encore enregistrées sur Drive. Les remplacer par ce fichier ?')) return false;
+    if (!skip && older.length && !confirm(`Ce fichier est plus ancien que ce qui est affiché pour : ${older.map((p) => LABEL[p]).join(', ')}. L'ouvrir quand même (ces parties reviendraient en arrière) ?`)) return false;
     for (const [f, d] of Object.entries(files)) { data.saveWorking(f, d, app.source[f].revision, { dirty: false }); app.files[f] = d; }
     setMeta({ name: label, opened_at: new Date().toISOString(), saved_at: null, drive_id: null, drive_version: null, drive_md5: null, ...extraMeta });
+    remoteNewer = false;
     render(); refresh();
     toast(`Ouvert : ${label} (portefeuille rév. ${app.files.portfolio.revision}).`);
     return true;
@@ -137,7 +145,35 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
     try { await fn(); } catch (e) { toast(e.message, 'error'); if (/expirée/.test(e.message)) session = null; }
     updateBadge(); refresh();
   }
-  const login = () => guard(async () => { session = await signIn(clientId()); toast('Connecté à Google Drive.'); });
+  const login = () => guard(async () => { session = await signIn(clientId()); toast('Connecté à Google Drive.'); await checkRemote(); });
+  /** Logged in: is the Drive file different from what we last opened / saved? Updates the badge. */
+  async function checkRemote() {
+    const m = meta();
+    if (!loggedIn() || !m.drive_id) return;
+    const target = await files(null).meta(m.drive_id).catch(() => null);
+    remoteNewer = Boolean(target) && remoteChanged(target, m);
+    updateBadge();
+  }
+  /** Real conflict: Drive changed elsewhere and we are about to save. Resolves 'replace' | 'load' | 'both' | null. */
+  function chooseConflict(target) {
+    return new Promise((resolve) => {
+      const who = target.lastModifyingUser?.displayName;
+      let settled = false;
+      const done = (v) => { if (settled) return; settled = true; dialog.removeEventListener('close', onClose); resolve(v); };
+      const onClose = () => done(null);
+      dialog.addEventListener('close', onClose);
+      if (!dialog.open) dialog.showModal();
+      dialog.innerHTML = `<form method="dialog" class="editor data-dialog"><h2>Deux versions différentes</h2>
+        <p>${data.BUNDLE_NAME} sur Drive a été modifié le <strong>${when(target.modifiedTime)}</strong>${who ? ` (${esc(who)})` : ''}, ailleurs qu’ici (autre appareil ?). Que faire ?</p>
+        <div class="conflict-choices">
+          <button type="button" class="primary" data-c="both">Garder les deux : copier la version Drive à côté, puis enregistrer la mienne</button>
+          <button type="button" data-c="replace">Remplacer la version Drive par la mienne (Drive garde l’ancienne dans son historique)</button>
+          <button type="button" data-c="load">Abandonner la mienne et charger la version Drive</button>
+        </div>
+        <div class="dialog-actions"><button type="button" data-c="">Annuler</button></div></form>`;
+      dialog.querySelectorAll('[data-c]').forEach((b) => b.addEventListener('click', () => done(b.dataset.c || null)));
+    });
+  }
   // (guard returns a promise: callers await login() then check loggedIn())
   const openDrive = () => guard(async () => {
     const dir = await ensureFolder();
@@ -155,22 +191,35 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
   const saveDrive = () => guard(async () => {
     const dir = await ensureFolder();
     if (!dir) return;
-    const text = data.makeBundle(app.files);
+    if (!beforeSave()) return;
     const m = meta();
     let target = m.drive_id ? await files().meta(m.drive_id).catch(() => null) : null;
     if (target && !target.parents?.includes(dir.id)) target = null; // opened from another folder: save in the chosen one
     if (!target) target = (await files().list())[0] ?? null;
     // Changed since we opened / last saved it? Compare the CONTENT checksum: Drive bumps `version` by itself after
     // an upload, which made our own save look like someone else's (false alarm -> snapshots lost on Annuler).
-    const changed = target && (target.md5Checksum && m.drive_md5 ? target.md5Checksum !== m.drive_md5 : String(target.version) !== String(m.drive_version ?? ''));
-    if (changed) {
-      const who = target.lastModifyingUser?.displayName;
-      if (!confirm(`${data.BUNDLE_NAME} sur Drive a été modifié le ${when(target.modifiedTime)}${who ? ` (${who})` : ''} depuis votre ouverture. Le remplacer par la version affichée ici ?\n(Annuler, puis « Ouvrir depuis Drive » pour récupérer l'autre version.)`)) return;
+    // Real conflict only: Drive's content changed since we opened / saved it, or it is another file than ours.
+    const foreign = target && (target.id !== m.drive_id || remoteChanged(target, m));
+    let copied = null;
+    if (foreign) {
+      const choice = await chooseConflict(target);
+      if (!choice) { toast('Enregistrement annulé : rien n’a changé sur Drive.'); return; }
+      if (choice === 'load') {
+        const obj = JSON.parse(await files().read(target.id));
+        await openObjects([{ name: target.name, obj }], `Drive (${when(target.modifiedTime)})`, { drive_id: target.id, drive_version: target.version, drive_md5: target.md5Checksum ?? null, skipConfirm: true });
+        return;
+      }
+      if (choice === 'both') {
+        copied = copyName(data.BUNDLE_NAME);
+        await driveFiles(session.token, copied, undefined, dir.id).create(await files().read(target.id));
+      }
     }
+    const text = data.makeBundle(app.files);
     const saved = target ? await files().update(target.id, text) : await files().create(text);
     for (const f of data.FILES) data.saveWorking(f, app.files[f], app.source[f].revision, { dirty: false });
-    setMeta({ saved_at: new Date().toISOString(), drive_id: saved.id, drive_version: saved.version, drive_md5: saved.md5Checksum ?? null });
-    toast(target ? `${data.BUNDLE_NAME} remplacé dans « ${dir.path} » (version précédente gardée dans l'historique Drive).` : `${data.BUNDLE_NAME} créé dans « ${dir.path} ».`);
+    setMeta({ saved_at: new Date().toISOString(), saved_where: 'drive', drive_id: saved.id, drive_version: saved.version, drive_md5: saved.md5Checksum ?? null });
+    remoteNewer = false;
+    toast(`Enregistré dans « ${dir.path} » : positions, cours et relevé du jour.${copied ? ` Version Drive précédente gardée sous « ${copied} ».` : ''}`);
   });
 
   // ------------------------------------------------------------------ save
@@ -185,6 +234,7 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
   }
 
   function saveLocal() {
+    if (!beforeSave()) return;
     data.downloadText(data.BUNDLE_NAME, data.makeBundle(app.files));
     markSaved('local');
     toast(`${data.BUNDLE_NAME} téléchargé (dossier Téléchargements).`);
@@ -192,6 +242,7 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
 
   async function saveToDrive() {
     if (clientId()) { if (!loggedIn()) await login(); if (loggedIn()) await saveDrive(); return; }
+    if (!beforeSave()) return;
     const text = data.makeBundle(app.files);
     if (isPhone()) {
       try { await navigator.share({ files: [new File([text], data.BUNDLE_NAME, { type: 'application/json' })], title: 'Wealth Board' }); }
@@ -278,7 +329,7 @@ export function initDataUI({ app, render, toast, dialog, badge, openButton, open
     });
   }
 
-  const show = () => { dialog.showModal(); refresh(); };
+  const show = () => { dialog.showModal(); refresh(); checkRemote().then(refresh).catch(() => {}); };
   openButton.addEventListener('click', show);
   badge.addEventListener('click', show);
   ['wb.drive', 'wb.folder', 'wb.source'].forEach((k) => localStorage.removeItem(k)); // leftovers of the removed OAuth sync

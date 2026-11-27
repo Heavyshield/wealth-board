@@ -11,6 +11,7 @@ import { importTests } from './import.test.js';
 import { editingTests } from './editing.test.js';
 import { filesTests } from './files.test.js';
 import { stageGTests } from './stage-g.test.js';
+import { saveTests } from './save.test.js';
 import { modelTests } from './model.test.js';
 import { metricsTests } from './metrics.test.js';
 import { evaluateRules, evaluateHolding, evaluateConstraints, reviewItems } from '../src/rules.js';
@@ -247,6 +248,7 @@ await filesTests({ test, assert, eq, files, schemas, validate, NOW });
 
 // ---------------------------------------------------------------- stage g: snapshot, export, optional Drive login
 await stageGTests({ test, assert, eq, files, schemas, validate, NOW, rows, expected });
+await saveTests({ test, assert, eq, files, schemas, validate, NOW, rows });
 
 // ---------------------------------------------------------------- extensible model + Éditeur Données
 await modelTests({ test, assert, eq, files, schemas, validate, NOW });

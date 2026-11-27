@@ -210,9 +210,18 @@ to detect that a file changed under a local copy and asks the user instead of ov
   `{ "format": "wealth-board/1", "saved_at", "portfolio": {...}, "config": {...}, "history": {...} }`, pretty-printed.
   Each part follows its schema in /schema. The board also opens the three files separately.
 - Flow: Données → Ouvrir (file picker; phones offer Google Drive) -> working copy in localStorage
-  (`wb.working.<file>` { data, dirty, base_revision }) -> edits mark it dirty (badge "Modifié · à enregistrer sur
-  Drive") -> Enregistrer = navigator.share (phone: "Enregistrer dans Drive") or download (computer).
-- Guards: opening over unsaved changes, or a file with a lower portfolio revision, asks for confirmation.
+  (`wb.working.<file>` { data, dirty, base_revision }) -> edits mark it dirty -> Enregistrer = Drive (login),
+  navigator.share (phone) or download (computer).
+- **One save (2026-11-27, src/save-plan.js):** every Enregistrer first runs `prepareSave`: live prices newer than the
+  file -> persistPrices; real data -> today's snapshot (addSnapshot, one per local day). No "Mémoriser les cours"
+  button any more; "Refaire le relevé maintenant" stays. Still no auto-save / background sync (user rule).
+- Badge, 3 states: "Sur Drive ✓ time" (or "Téléchargé"), "Non enregistré sur Drive", "Plus récent sur Drive · ouvrir"
+  (logged in: checked after login and when Données opens, by content md5).
+- Drive conflict = content md5 changed since opened / saved, or another file than ours (`remoteChanged`; Drive bumps
+  `version` by itself, so version is only a fallback). Choices: keep both (Drive copy saved as
+  `wealth-board (copie YYYY-MM-DD HHhMM).json`, then ours), replace (Drive history keeps the old one), load Drive's.
+- Guards: opening over unsaved changes, or a file older on ANY part (`olderParts`: portfolio, config, history),
+  asks for confirmation.
   The repo-sample conflict banner only applies while the working copy is still sample data.
 - Éditeur Données fragment keys: holdings, envelopes, asset_classes, rules, constraints (by id, replaced whole), remove.
 - **Claude editing the data:** read `wealth-board.json` from Drive, edit the part(s), bump that part's `revision` +
@@ -254,8 +263,8 @@ to detect that a file changed under a local copy and asks the user instead of ov
 - Cache `wb.cache.prices` (localStorage) keyed `provider:symbol`; settings `wb.settings.prices` (proxy URL, keys)
   stay in the browser -- never in data files or the repo.
 - `mergeLive`: newest `as_of` wins between live cache and file (so prices Claude writes are not overwritten by older
-  cache). FX block takes the oldest live as_of (conservative). "Mémoriser les cours" writes them into the file
-  (last_price + market_snapshot, revision+1, one changelog entry `field: "prices"`).
+  cache). FX block takes the oldest live as_of (conservative). Each Enregistrer writes them into the file
+  (persistPrices: last_price + market_snapshot, revision+1, one changelog entry `field: "prices"`).
 - Ticker assistant: proxy `GET /search?isins=` (Yahoo search, cached 24 h at the edge) -> listings; best = first in
   `config.providers.preferred_exchanges`; quoteType EQUITY/ETF/MUTUALFUND suggests class equity/etf/fund. The user
   confirms each line (some ETFs resolve to a listing in another currency, e.g. IWDA.L in USD). Search fixtures use

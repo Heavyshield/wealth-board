@@ -14,6 +14,7 @@ import * as prices from './prices.js';
 import { initImport } from './import-ui.js';
 import { createEditors } from './editors.js';
 import { initDataUI } from './data-ui.js';
+import { prepareSave } from './save-plan.js';
 import { makeSnapshot, addSnapshot, buildClaudeExport } from './claude-export.js';
 import { renderJournal } from './journal.js';
 import { createJsonEditor } from './json-editor.js';
@@ -128,8 +129,7 @@ function renderPriceStatus(progress) {
       ${errs.length ? `<ul class="ps-errors">${errs.slice(0, 30).map((e) => `<li><code>${esc(e.k)}</code> (${esc(e.p)}) : ${esc(e.m)}</li>`).join('')}</ul>` : ''}
     </details>` : ''}
     ${noTicker ? `<button type="button" id="fill-tickers">${noTicker} ligne(s) sans ticker · Compléter</button>` : ''}
-    ${live || Object.keys(app.live.fx).length || Object.keys(app.live.spot).length ? '<button type="button" id="persist-prices" title="Écrire ces cours dans portfolio.json (copie locale) pour Claude et les autres appareils">Mémoriser les cours</button>' : ''}`;
-  $('#persist-prices')?.addEventListener('click', persistPrices);
+    `;
   $('#fill-tickers')?.addEventListener('click', () => app.editors.openTickers());
 }
 
@@ -168,7 +168,7 @@ function takeSnapshot() {
   if (errs.history) { toast(`Relevé refusé : ${errs.history[0].path} : ${errs.history[0].message}`, 'error'); return; }
   saveLocal('history', history);
   render();
-  toast(`Relevé du ${snap.date} enregistré : ${fmt.money(snap.total, app.files.config.base_currency, { digits: 0 })}. Pensez à enregistrer sur Drive.`);
+  toast(`Relevé du ${snap.date} refait : ${fmt.money(snap.total, app.files.config.base_currency, { digits: 0 })}. Il part sur Drive au prochain « Enregistrer ».`);
 }
 
 async function exportForClaude() {
@@ -240,13 +240,15 @@ function removeSample() {
   }
 }
 
-function persistPrices() {
-  const next = prices.persistPrices(app.files.portfolio, app.merged, 'user');
-  const errs = data.validateAll({ ...app.files, portfolio: next }, app.schemas);
-  if (errs.portfolio) { toast(`Refusé : ${errs.portfolio[0].path} : ${errs.portfolio[0].message}`, 'error'); return; }
-  saveLocal('portfolio', next);
-  render();
-  toast(`Cours mémorisés dans la copie locale (rév. ${next.revision}).`);
+/** Called by every "Enregistrer": current prices + today's snapshot go into the files (save-plan.js). */
+function beforeSave() {
+  const { files, changed } = prepareSave({ files: app.files, merged: app.merged, rows: app.rows, config: app.files.config });
+  const errs = data.validateAll(files, app.schemas);
+  const bad = changed.find((p) => errs[p]);
+  if (bad) { toast(`Enregistrement refusé : ${bad} · ${errs[bad][0].path} : ${errs[bad][0].message}`, 'error'); return false; }
+  for (const p of changed) saveLocal(p, files[p]);
+  if (changed.length) render();
+  return true;
 }
 
 function initSettings() {
@@ -350,7 +352,7 @@ async function main() {
     $('#snapshot').addEventListener('click', takeSnapshot);
     $('#claude-export').addEventListener('click', exportForClaude);
     app.jsonEditor = createJsonEditor({ dialog: $('#json-editor'), getFiles: () => app.files, schemas: app.schemas, commitFiles });
-    app.dataUI = initDataUI({ app, render, toast, dialog: $('#data'), badge: $('#sync-badge'), openButton: $('#open-data'), openEditor: (mode) => app.jsonEditor.open(mode) });
+    app.dataUI = initDataUI({ app, render, toast, dialog: $('#data'), badge: $('#sync-badge'), openButton: $('#open-data'), openEditor: (mode) => app.jsonEditor.open(mode), beforeSave });
     app.editors = createEditors({ dialog: $('#editor'), getState: () => ({ portfolio: app.files.portfolio, config: app.files.config }), commit: commitPortfolio });
     $('#remove-sample').addEventListener('click', removeSample);
     initImport({

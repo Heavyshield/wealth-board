@@ -149,8 +149,9 @@ Elles ne sont **jamais** dans le dépôt GitHub : seulement dans `wealth-board.j
 puis Importer CSV (PEA Boursorama), Compléter les tickers, et Enregistrer sur Drive.
 
 ## Relevés, export pour Claude, journal
-- **Enregistrer le relevé du jour** (carte « Évolution du patrimoine ») : ajoute la valeur du jour et sa répartition
-  à l'historique (un relevé par jour, remplaçable). Puis enregistrez sur Drive.
+- **Relevé automatique** : chaque « Enregistrer » (Données) écrit aussi les cours du moment et le relevé du jour
+  (valeur et répartition, un par jour, remplacé si vous réenregistrez). « Refaire le relevé maintenant » (carte
+  « Évolution du patrimoine ») le refait sans enregistrer.
 - **Copier pour Claude** (en-tête) : copie un résumé (synthèse, répartition, à revoir, dernières modifications +
   toutes les lignes en JSON) à coller dans une conversation avec Claude. Données personnelles : ne le collez pas ailleurs.
 - **Journal des modifications** (sous le tableau) : chaque changement, par vous ou par Claude, avec avant → après.
